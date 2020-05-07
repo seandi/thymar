@@ -6,3 +6,6 @@ The script `Thymar.py` implements the main interface for the robot, it takes car
 All the other scripts are taken from the second lab and implement the logic for the random exploration and are used for now as a demo.
 
 The reading of the point cloud is missing.
+
+## Run the demo
+`rosrun thymar Thymar.py _name:=thymar`
