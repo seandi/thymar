@@ -21,7 +21,7 @@ To install the packages
 ## Overview
 The repo contains the ros packages for the Thymar robot. Inside the thymar folder there are two packages: 
 1. the thymar_description is the ros package containing all the models and launch file for similating in Gazebo the Thymar robot
-2. the thymar package contains the scripts for controlling the robot
+2. the thymar package contains the scripts for controlling the robot, see [readme](thymar/README.md)
 
 ### The Thymar robot model 
 The gazebo simulation of the robot can be launched as follows
