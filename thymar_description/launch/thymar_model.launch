@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<launch>
+
+  <arg name="name" default=""/>
+  <arg name="pose" default="-x 0 -y 0 -z 0"/>
+  <arg name="tf_name" value="$(eval arg('name') + '/' if arg('name') else '')"/>
+
+  <arg name="left_wheel_friction" default="1"/>
+  <arg name="right_wheel_friction" default="1"/>
+  <arg name="wheel_kp" default="100000"/>
+  <arg name="body_kp" default="175000"/>
+
+  <arg name="proximity_max_range" default="0.12"/>
+  <arg name="proximity_resolution" default="0.005"/>
+  <arg name="proximity_fov" default="0.3"/>
+
+  <arg name="publish_ground_truth" default="false"/>
+  <arg name="ground_truth_frame_id" default="/world"/>
+  <arg name="ground_truth_frame_rate" default="30.0"/>
+
+  <arg name="odom_max_rate" default="20.0"/>
+  <arg name="gpu" default="false"/>
+
+  <!-- Spawn the Thymar robot -->
+  <group ns="$(eval arg('name') or '/')">
+	  <param name="tf_prefix" value="$(arg name)"/>
+	  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find thymar_description)/urdf/thymar.urdf.xacro' gpu:=$(arg gpu) name:=$(arg tf_name)" />
+          <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+	    <param name="publish_frequency" type="double" value="30.0" />
+	  </node>
+	  <node pkg="gazebo_ros" type="spawn_model" name="spawn_model" args="-urdf -param robot_description -model thymar"/>
+	  
+</group>
+
+
+</launch>
