@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+
+  <arg name="name" default="thymar"/>
+  <arg name="grid_width" default="10.0"/>
+
+  <node pkg="tf" type="static_transform_publisher" name="map_bade_link" args="-5.0 -5.0 0 0 0 0 /$(arg name)/base_link /map 100"/>
+  <node name="Lidar_processor" pkg="thymar_lidar" type="thymar_lidar" >
+  	<param name="name" value="$(arg name)" />
+  </node>
+
+
+</launch>
