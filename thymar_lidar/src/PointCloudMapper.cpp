@@ -11,8 +11,14 @@ PointCloudMapper::PointCloudMapper(int grid_width, int grid_height, float grid_r
 	
 }
 
-void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cloud){
-	this->world_point_cloud = new_point_cloud;
+void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cloud, Pose2d pose2d){
+	if(this->first){
+		this->world_point_cloud=new_point_cloud;
+		this->first=false;
+	}else{
+		this->world_point_cloud+=this->transform(new_point_cloud, pose2d.x,pose2d.y,0.0,pose2d.theta);;
+		std::cout << pose2d.x << pose2d.y << pose2d.theta << std::endl;
+	}
 
 	this->world_point_cloud = this->downSample(this->world_point_cloud.makeShared());
 
@@ -49,6 +55,17 @@ std::vector<signed char> PointCloudMapper::getOccupancyGrid(){
 
 pcl::PointCloud<pcl::PointXYZ> PointCloudMapper::getWorldPointCloud(){
 	return this->world_point_cloud;
+}
+
+pcl::PointCloud<pcl::PointXYZ> PointCloudMapper::transform(pcl::PointCloud<pcl::PointXYZ> source_cloud, float x, float y, float z, float theta){
+	Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+	transform.translation() << x,y,z;
+	transform.rotate(Eigen::AngleAxisf(theta,Eigen::Vector3f::UnitZ()));
+
+	pcl::PointCloud<pcl::PointXYZ> target_cloud;
+
+	pcl::transformPointCloud(source_cloud, target_cloud, transform);
+	return target_cloud;
 }
 
 

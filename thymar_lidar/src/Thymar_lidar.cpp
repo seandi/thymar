@@ -4,8 +4,13 @@
 #include <pcl_ros/point_cloud.h>
 #include "pcl_conversions/pcl_conversions.h"
 #include "nav_msgs/OccupancyGrid.h"
+#include "nav_msgs/Odometry.h"
+#include <geometry_msgs/Pose.h>
+#include <tf/tf.h>
 #include <string>
 #include "PointCloudMapper.hpp"
+
+
 
 
 class ThymarLidar{
@@ -15,11 +20,13 @@ private:
     ros::Subscriber pointcloud_subscriber;
     ros::Publisher pointcloud_publisher;
     ros::Publisher grid_publisher;
+    ros::Subscriber odometry_subscriber;
 
 
     std::string name;
     PointCloudMapper* mapper;
     pcl::PointCloud<pcl::PointXYZ> cloud;
+    Pose2d pose2d;
     nav_msgs::OccupancyGrid grid;
     bool new_point_cloud = false;
 
@@ -27,6 +34,7 @@ public:
 	ThymarLidar(int argc, char** argv, float hz=10, int grid_width=10, int grid_height=10, float grid_resolution=0.05);
 	~ThymarLidar(){delete mapper;};
 	void processLidarMeasurement(const pcl::PCLPointCloud2ConstPtr& cloud_msg);
+	void parseOdometry(const nav_msgs::Odometry::ConstPtr& msg);
 	void run();
        
 };
@@ -42,6 +50,7 @@ ThymarLidar::ThymarLidar(int argc, char** argv, float hz, int grid_width, int gr
 		this->pointcloud_subscriber = this->nh.subscribe<pcl::PCLPointCloud2>("/" +this->name +"/velodyne_points", 5, &ThymarLidar::processLidarMeasurement, this);
         this->pointcloud_publisher = this->nh.advertise<pcl::PointCloud<pcl::PointXYZ> > ("/" +this->name +"/world_map", 1);
         this->grid_publisher = this->nh.advertise<nav_msgs::OccupancyGrid>("/" +this->name +"/occupancy_grid", 1);
+        this->odometry_subscriber = this->nh.subscribe<nav_msgs::Odometry>("/" +this->name +"/odom", 5, &ThymarLidar::parseOdometry, this);
 
         this->grid.info.resolution = grid_resolution;
 		this->grid.info.width = (int) std::round(grid_width/grid_resolution);
@@ -61,12 +70,33 @@ void ThymarLidar::processLidarMeasurement(const pcl::PCLPointCloud2ConstPtr& clo
 		this->new_point_cloud = true;
 	}
 
+void ThymarLidar::parseOdometry(const nav_msgs::Odometry::ConstPtr& msg){
+
+		double x = msg->pose.pose.position.x;
+		double y = msg->pose.pose.position.y;
+
+		tf::Quaternion q(
+			msg->pose.pose.orientation.x,
+			msg->pose.pose.orientation.y,
+			msg->pose.pose.orientation.z,
+			msg->pose.pose.orientation.w
+		);
+		tf::Matrix3x3 m(q);
+		double roll, pitch, yaw;
+		m.getRPY(roll, pitch, yaw);
+
+		this->pose2d.x = x;
+		this->pose2d.y = y;
+		this->pose2d.theta = yaw;
+		
+	}
+
 void ThymarLidar::run(){
 	while(ros::ok()){
 
 		if(this->new_point_cloud){
 			this->new_point_cloud=false;
-			this->mapper->addPointCloud(this->cloud);
+			this->mapper->addPointCloud(this->cloud, this->pose2d);
 
 			
 			this->grid.data = this->mapper->getOccupancyGrid();
