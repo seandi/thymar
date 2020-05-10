@@ -12,7 +12,7 @@
   2. git clone https://bitbucket.org/DataspeedInc/velodyne_simulator.git
   3. catkin build
   
-## Install packages
+## How to Install
 To install the packages
 1. move to catkin_ws/src/
 2. git clone https://github.com/seandi/thymar.git
@@ -21,8 +21,15 @@ To install the packages
 ## Overview
 The repo contains the ros packages for the Thymar robot. Inside the thymar folder there are two packages: 
 1. the thymar_description is the ros package containing all the models and launch file for similating in Gazebo the Thymar robot
-2. the thymar package contains the scripts for controlling the robot
+2. the thymar package contains the scripts for controlling the robot, see [readme](thymar/README.md)
 
 ### The Thymar robot model 
 The gazebo simulation of the robot can be launched as follows
 `roslaunch thymar_description thymar_gazebo_bringup.launch name:=thymar world:=empty`
+
+## Visualizing the pointcloud
+To visualize the point cloud from the Thymar:
+1. open a new terminal and start `rviz`
+2. change *fixed frame* from *map* to *name_of_the_robot/velodyne*
+3. click add -> scroll down to PointCloud2 
+4. under pointcloud2 set topic=*name_of_the_robot/velodyne_points*
