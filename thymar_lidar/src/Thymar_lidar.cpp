@@ -6,9 +6,6 @@
 #include "nav_msgs/OccupancyGrid.h"
 #include <string>
 #include "PointCloudMapper.hpp"
-#include <tf2_ros/static_transform_broadcaster.h>
-#include <tf2/LinearMath/Quaternion.h>
-#include <geometry_msgs/TransformStamped.h>
 
 
 class ThymarLidar{
@@ -18,8 +15,7 @@ private:
     ros::Subscriber pointcloud_subscriber;
     ros::Publisher pointcloud_publisher;
     ros::Publisher grid_publisher;
-    tf2_ros::StaticTransformBroadcaster static_broadcaster;
-	geometry_msgs::TransformStamped transform;
+
 
     std::string name;
     PointCloudMapper* mapper;
@@ -53,21 +49,6 @@ ThymarLidar::ThymarLidar(int argc, char** argv, float hz, int grid_width, int gr
 
 		this->mapper= new PointCloudMapper((int) std::round(grid_width/grid_resolution), (int) std::round(grid_height/grid_resolution), grid_resolution);
 
-		
-		this->transform.header.frame_id = "world";
-		this->transform.child_frame_id = this->name+"/base_link";
-		this->transform.transform.translation.x = -(int)std::round(grid_width/2.0);
-		this->transform.transform.translation.y = -(int)std::round(grid_height/2.0);
-		this->transform.transform.translation.z = 0.0;
-		tf2::Quaternion quat;
-        quat.setRPY(0.0,0.0,0.0);
-        this->transform.transform.rotation.x = quat.x();
-        this->transform.transform.rotation.y = quat.y();
-        this->transform.transform.rotation.z = quat.z();
-        this->transform.transform.rotation.w = quat.w();
-
-
-
 		std::cout << "Lidar PointCloud Processor node initialised for robot " << this->name << std::endl;
 	
 
@@ -95,10 +76,6 @@ void ThymarLidar::run(){
         	this->pointcloud_publisher.publish(world_map);
 		}
 
-
-		this->transform.header.stamp = ros::Time::now();
-		this->static_broadcaster.sendTransform(this->transform);
-		
 		ros::spinOnce();
 		this->rate.sleep();
 	}
