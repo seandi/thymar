@@ -14,28 +14,33 @@ PointCloudMapper::PointCloudMapper(int grid_width, int grid_height, float grid_r
 void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cloud, Pose2d pose2d){
 	if(this->first){
 		this->world_point_cloud=new_point_cloud;
+		this->obstacles_point_cloud = this->directionalFilter(new_point_cloud, "z", 0.0, 5.0);
 		this->first=false;
 	}else{
-		this->world_point_cloud+=this->transform(new_point_cloud, pose2d.x,pose2d.y,0.0,pose2d.theta);;
+		pcl::PointCloud<pcl::PointXYZ> rotated_new_point_cloud = this->transform(new_point_cloud, pose2d.x,pose2d.y,0.0,pose2d.theta);
+		
+		this->world_point_cloud+=rotated_new_point_cloud;
+
+		pcl::PointCloud<pcl::PointXYZ> filtered_new_point_cloud = this->directionalFilter(new_point_cloud, "z", 0.0, 5.0);
+		this->obstacles_point_cloud+=filtered_new_point_cloud;
 		std::cout << pose2d.x << pose2d.y << pose2d.theta << std::endl;
 	}
 
 	this->world_point_cloud = this->downSample(this->world_point_cloud.makeShared());
+	this->obstacles_point_cloud = this->downSample(this->obstacles_point_cloud.makeShared());
+
+    
+	
 
 	float x,y,z;
-    for(int n=0; n<this->world_point_cloud.points.size(); n++){
-    	x = this->world_point_cloud.points[n].x;
-    	y = this->world_point_cloud.points[n].y;
-    	z =this->world_point_cloud.points[n].z;
+    for(int n=0; n<this->obstacles_point_cloud.points.size(); n++){
+    	x = this->obstacles_point_cloud.points[n].x;
+    	y = this->obstacles_point_cloud.points[n].y;
 
     	int xi = (int) std::round(x/grid_resolution);
     	int yi = (int) std::round(y/grid_resolution);
-    	if(z > 0.10){
-    		this->occupancy_grid[(yi+(this->grid_height/2))*this->grid_width+xi+(this->grid_width/2)] = 100;
 
-    	}else{
-    		;//grid_data[(yi+60)*120+xi+60] = 0;
-    	}
+    	this->occupancy_grid[(yi+(this->grid_height/2))*this->grid_width+xi+(this->grid_width/2)] = 100;
     }
 }
 
@@ -44,7 +49,7 @@ pcl::PointCloud<pcl::PointXYZ> PointCloudMapper::downSample(pcl::PointCloud<pcl:
 
 	pcl::VoxelGrid<pcl::PointXYZ> sor;
     sor.setInputCloud(source_cloud);
-    sor.setLeafSize(0.1,0.1,0.1);
+    sor.setLeafSize(0.05,0.05,0.1);
     sor.filter(target_cloud);
     return target_cloud;  
 }
@@ -66,6 +71,32 @@ pcl::PointCloud<pcl::PointXYZ> PointCloudMapper::transform(pcl::PointCloud<pcl::
 
 	pcl::transformPointCloud(source_cloud, target_cloud, transform);
 	return target_cloud;
+}
+
+pcl::PointCloud<pcl::PointXYZ> PointCloudMapper::directionalFilter(pcl::PointCloud<pcl::PointXYZ> source_cloud, std::string axis,
+ float lower_bound, float upper_bound,
+  pcl::PointCloud<pcl::PointXYZ>::Ptr outliers_cloud)
+{
+
+	pcl::PointCloud<pcl::PointXYZ> filtered_cloud;
+
+	pcl::PassThrough<pcl::PointXYZ> filter;
+	filter.setInputCloud (source_cloud.makeShared());
+	filter.setFilterFieldName (axis);
+	filter.setFilterLimits (lower_bound,upper_bound);
+	filter.filter (filtered_cloud);
+
+	/*
+	pcl::IndicesConstPtr indices = filter.getRemovedIndices();
+
+
+	pcl::ExtractIndices<pcl::PointXYZ> extract;
+ 
+	extract.setInputCloud (source_cloud.makeShared());
+	extract.setIndices (indices);
+	extract.filter (*outliers_cloud);*/
+
+	return filtered_cloud;
 }
 
 
