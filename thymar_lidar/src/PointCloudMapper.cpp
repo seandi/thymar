@@ -12,22 +12,30 @@ PointCloudMapper::PointCloudMapper(int grid_width, int grid_height, float grid_r
 }
 
 void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cloud, Pose2d pose2d){
+	pcl::PointCloud<pcl::PointXYZ> terrain_cloud; 
+
 	if(this->first){
 		this->world_point_cloud=new_point_cloud;
-		this->obstacles_point_cloud = this->directionalFilter(new_point_cloud, "z", 0.0, 5.0);
+
+		this->obstacles_point_cloud = this->directionalFilter(new_point_cloud, "z", 0.0, 5.0, terrain_cloud);
+		this->terrain_point_cloud = terrain_cloud;
+
+
 		this->first=false;
 	}else{
 		pcl::PointCloud<pcl::PointXYZ> rotated_new_point_cloud = this->transform(new_point_cloud, pose2d.x,pose2d.y,0.0,pose2d.theta);
 		
 		this->world_point_cloud+=rotated_new_point_cloud;
 
-		pcl::PointCloud<pcl::PointXYZ> filtered_new_point_cloud = this->directionalFilter(new_point_cloud, "z", 0.0, 5.0);
+		pcl::PointCloud<pcl::PointXYZ> filtered_new_point_cloud = this->directionalFilter(new_point_cloud, "z", 0.0, 5.0, terrain_cloud);
 		this->obstacles_point_cloud+=filtered_new_point_cloud;
+		this->terrain_point_cloud+=terrain_cloud;
 		
 	}
 
 	this->world_point_cloud = this->downSample(this->world_point_cloud.makeShared());
 	this->obstacles_point_cloud = this->downSample(this->obstacles_point_cloud.makeShared());
+    this->terrain_point_cloud = this->downSample(this->terrain_point_cloud.makeShared());
 
     
 	
@@ -75,18 +83,18 @@ pcl::PointCloud<pcl::PointXYZ> PointCloudMapper::transform(pcl::PointCloud<pcl::
 
 pcl::PointCloud<pcl::PointXYZ> PointCloudMapper::directionalFilter(pcl::PointCloud<pcl::PointXYZ> source_cloud, std::string axis,
  float lower_bound, float upper_bound,
-  pcl::PointCloud<pcl::PointXYZ>::Ptr outliers_cloud)
+  pcl::PointCloud<pcl::PointXYZ>& outliers_cloud)
 {
 
 	pcl::PointCloud<pcl::PointXYZ> filtered_cloud;
 
-	pcl::PassThrough<pcl::PointXYZ> filter;
+	pcl::PassThrough<pcl::PointXYZ> filter(true);
 	filter.setInputCloud (source_cloud.makeShared());
 	filter.setFilterFieldName (axis);
 	filter.setFilterLimits (lower_bound,upper_bound);
 	filter.filter (filtered_cloud);
 
-	/*
+	
 	pcl::IndicesConstPtr indices = filter.getRemovedIndices();
 
 
@@ -94,8 +102,8 @@ pcl::PointCloud<pcl::PointXYZ> PointCloudMapper::directionalFilter(pcl::PointClo
  
 	extract.setInputCloud (source_cloud.makeShared());
 	extract.setIndices (indices);
-	extract.filter (*outliers_cloud);*/
-
+	extract.filter (outliers_cloud);
+	
 	return filtered_cloud;
 }
 

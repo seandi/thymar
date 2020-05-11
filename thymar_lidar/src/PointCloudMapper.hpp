@@ -28,7 +28,7 @@ private:
 	pcl::PointCloud<pcl::PointXYZ> transform(pcl::PointCloud<pcl::PointXYZ> source_cloud, float x, float y, float z, float theta);
 	pcl::PointCloud<pcl::PointXYZ> directionalFilter(
 		pcl::PointCloud<pcl::PointXYZ> source_cloud, std::string axis, float lower_bound, float upper_bound,
-		pcl::PointCloud<pcl::PointXYZ>::Ptr outliers_cloud=NULL
+		pcl::PointCloud<pcl::PointXYZ>& outliers_cloud
 	);
 public:
 	PointCloudMapper(int grid_width=10, int grid_height=10, float grid_resolution=0.05);
