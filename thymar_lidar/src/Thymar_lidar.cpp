@@ -25,12 +25,15 @@ private:
     ros::Publisher terrain_publisher;
 
 
+
     std::string name;
     PointCloudMapper* mapper;
     pcl::PointCloud<pcl::PointXYZ> cloud;
     Pose2d pose2d;
     nav_msgs::OccupancyGrid grid;
     bool new_point_cloud = false;
+    SphereModel target_model;
+    bool target_found = false;
 
 public:
 	ThymarLidar(int argc, char** argv, float hz=10, int grid_width=10, int grid_height=10, float grid_resolution=0.05);
@@ -114,6 +117,15 @@ void ThymarLidar::run(){
         	this->obstacles_publisher.publish(obstacles_map);
         	pcl::PointCloud<pcl::PointXYZ> terrain_map = this->mapper->getTerrainPointCloud();
         	this->terrain_publisher.publish(terrain_map);
+
+        	if(!this->target_found && this->mapper->isTargetFound()){
+        		this->target_found = true;
+        		this->target_model = this->mapper->getTargetModel();
+
+        		std::cout << "Model found in (" << this->target_model.x << ","  << this->target_model.y << ") " 
+				<< "with radius: "<< this->target_model.radius 
+				<< std::endl;
+        	}
 		}
 
 		ros::spinOnce();
