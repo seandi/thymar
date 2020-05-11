@@ -40,7 +40,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
     
 	
 
-	float x,y,z;
+	float x,y;
     for(int n=0; n<this->obstacles_point_cloud.points.size(); n++){
     	x = this->obstacles_point_cloud.points[n].x;
     	y = this->obstacles_point_cloud.points[n].y;
@@ -49,6 +49,22 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
     	int yi = (int) std::round(y/grid_resolution);
 
     	this->occupancy_grid[(yi+(this->grid_height/2))*this->grid_width+xi+(this->grid_width/2)] = 100;
+    }
+
+    
+    for(int n=0; n<this->terrain_point_cloud.points.size(); n++){
+    	x = this->terrain_point_cloud.points[n].x;
+    	y = this->terrain_point_cloud.points[n].y;
+
+    	int xi = (int) std::round(x/grid_resolution);
+    	int yi = (int) std::round(y/grid_resolution);
+
+    	int index = (yi+(this->grid_height/2))*this->grid_width+xi+(this->grid_width/2);
+    	// Do not overwrite obstacles grids!
+    	if(this->occupancy_grid[index] <= 0){
+    		this->occupancy_grid[index] = 0;
+    	}
+    	
     }
 }
 
