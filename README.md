@@ -12,6 +12,11 @@
   2. git clone https://bitbucket.org/DataspeedInc/velodyne_simulator.git
   3. catkin build
   
+ - ros_pcl (to be installed):
+  1. move to catkin_ws/src/
+  2. git clone https://github.com/ros-perception/perception_pcl.git
+  3. catkin build
+  
 ## How to Install
 To install the packages
 1. move to catkin_ws/src/
