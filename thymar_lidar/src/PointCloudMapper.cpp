@@ -23,7 +23,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 
 		pcl::PointCloud<pcl::PointXYZ> filtered_new_point_cloud = this->directionalFilter(new_point_cloud, "z", 0.0, 5.0);
 		this->obstacles_point_cloud+=filtered_new_point_cloud;
-		std::cout << pose2d.x << pose2d.y << pose2d.theta << std::endl;
+		
 	}
 
 	this->world_point_cloud = this->downSample(this->world_point_cloud.makeShared());

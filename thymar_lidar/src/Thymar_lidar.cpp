@@ -21,6 +21,8 @@ private:
     ros::Publisher pointcloud_publisher;
     ros::Publisher grid_publisher;
     ros::Subscriber odometry_subscriber;
+    ros::Publisher obstacles_publisher;
+    ros::Publisher terrain_publisher;
 
 
     std::string name;
@@ -51,6 +53,9 @@ ThymarLidar::ThymarLidar(int argc, char** argv, float hz, int grid_width, int gr
         this->pointcloud_publisher = this->nh.advertise<pcl::PointCloud<pcl::PointXYZ> > ("/" +this->name +"/world_map", 1);
         this->grid_publisher = this->nh.advertise<nav_msgs::OccupancyGrid>("/" +this->name +"/occupancy_grid", 1);
         this->odometry_subscriber = this->nh.subscribe<nav_msgs::Odometry>("/" +this->name +"/odom", 5, &ThymarLidar::parseOdometry, this);
+
+        this->obstacles_publisher = this->nh.advertise<pcl::PointCloud<pcl::PointXYZ> > ("/" +this->name +"/obstacles", 1);
+        this->terrain_publisher = this->nh.advertise<pcl::PointCloud<pcl::PointXYZ> > ("/" +this->name +"/traversable_terrain", 1);
 
         this->grid.info.resolution = grid_resolution;
 		this->grid.info.width = (int) std::round(grid_width/grid_resolution);
@@ -104,6 +109,11 @@ void ThymarLidar::run(){
 
 			pcl::PointCloud<pcl::PointXYZ> world_map = this->mapper->getWorldPointCloud();
         	this->pointcloud_publisher.publish(world_map);
+
+        	pcl::PointCloud<pcl::PointXYZ> obstacles_map = this->mapper->getObstaclesPointCloud();
+        	this->obstacles_publisher.publish(obstacles_map);
+        	pcl::PointCloud<pcl::PointXYZ> terrain_map = this->mapper->getTerrainPointCloud();
+        	this->terrain_publisher.publish(terrain_map);
 		}
 
 		ros::spinOnce();

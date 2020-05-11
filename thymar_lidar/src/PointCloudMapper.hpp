@@ -35,6 +35,9 @@ public:
 	void addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cloud, Pose2d pose2d);
 	std::vector<signed char> getOccupancyGrid();
 	pcl::PointCloud<pcl::PointXYZ> getWorldPointCloud();
+	pcl::PointCloud<pcl::PointXYZ> getObstaclesPointCloud(){return this->obstacles_point_cloud; };
+	pcl::PointCloud<pcl::PointXYZ> getTerrainPointCloud(){return this->terrain_point_cloud;};
+
 
 
 };
