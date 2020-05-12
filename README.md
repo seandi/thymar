@@ -28,9 +28,14 @@ The repo contains the ros packages for the Thymar robot. Inside the thymar folde
 1. the thymar_description is the ros package containing all the models and launch file for similating in Gazebo the Thymar robot
 2. the thymar package contains the scripts for controlling the robot, see [readme](thymar/README.md)
 
-### The Thymar robot model 
+### How to run
 The gazebo simulation of the robot can be launched as follows
 `roslaunch thymar_description thymar_gazebo_bringup.launch name:=thymar world:=empty`
+then launch the node processing the lidar pointcloud:
+`roslaunch thymar_lidar lidar_processor.launch name:=thymar`
+and finally launch the main script:
+`rosrun thymar Thymar.py _name:=thymar`
+NOTE: cuurently there is a bug for which if the target is immediately visible when the lidar node is started, the Thymar.py script may never receive its position.
 
 ## Visualizing the pointcloud
 To visualize the point cloud from the Thymar:
