@@ -10,7 +10,7 @@ from visualization_msgs.msg import Marker
 from math import pi
 import numpy as np
 from matplotlib import pyplot as plt
-
+from thymar_controller import ThymarController
 
 
 import movement_utils as mv
@@ -117,9 +117,11 @@ class Thymar:
 
     def run(self):
         self.controller = ExplorerController()
+        # self.controller = ThymarController()
         
         while not rospy.is_shutdown():
             vel = self.controller.run(self.proximity, self.position, self.orientation)
+            # vel = self.controller.run(self.position, self.orientation, self.occupancy_grid)
 
             # The y axis is plotted flipped. Plots the traversable terrain vs unexplored/obstacles OR the target if found.
             if(self.occupancy_grid.shape[0]>1 and self.plot_grid):
