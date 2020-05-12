@@ -41,7 +41,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 
     if(!this->target_found){
 	    sphere_coeff = this->locateSphere(this->obstacles_point_cloud);
-	    if(sphere_coeff.size()>=0){
+	    if(sphere_coeff.size()>0){
 	    	this->target_found=true;
 	    	this->target_model.x = sphere_coeff[0];
 	    	this->target_model.y = sphere_coeff[1];
