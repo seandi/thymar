@@ -8,6 +8,20 @@ PointCloudMapper::PointCloudMapper(int grid_width, int grid_height, float grid_r
 	this->occupancy_grid.resize(grid_width*grid_height);
 	std::fill(this->occupancy_grid.begin(),this->occupancy_grid.end(),-1);
 
+	for(int i=0; i<this->occupancy_grid.size(); i++){
+
+		int y = i%this->grid_width;
+		int x = i/this->grid_width;
+		float xf = (float) (x-this->grid_width/2.)*this->grid_resolution;
+		float yf = (float) (y-this->grid_height/2.)*this->grid_resolution;
+
+		
+		if((pow(xf,2) + pow(yf,2)) < pow(0.45,2)){
+			this->occupancy_grid[y*this->grid_width+x]=0;
+		}
+		
+	}
+
 	
 }
 
@@ -48,6 +62,9 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 	    	this->target_model.radius = sphere_coeff[3];
 	    }
 	}
+
+
+	
 	
 
 	float x,y;
