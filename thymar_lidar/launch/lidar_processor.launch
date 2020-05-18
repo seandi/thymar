@@ -4,10 +4,11 @@
   <arg name="name" default="thymar"/>
   <arg name="grid_width" default="10.0"/>
 
-  <node pkg="tf" type="static_transform_publisher" name="map_bade_link" args="-5.0 -5.0 0 0 0 0 /$(arg name)/base_link /map 100"/>
+  <node pkg="tf" type="static_transform_publisher" name="map_bade_link" args="-5.0 -5.0 0 0 0 0 /$(arg name)/odom /map 100" output="screen"/>
   <node name="Lidar_processor" pkg="thymar_lidar" type="thymar_lidar" output="screen">
   	<param name="name" value="$(arg name)" />
   </node>
 
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find thymar_lidar)/launch/thymar_lidar.rviz" />
 
 </launch>
