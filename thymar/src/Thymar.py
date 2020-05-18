@@ -36,6 +36,8 @@ class Thymar:
         self.velocity_publisher = rospy.Publisher('/' + self.name + '/cmd_vel', Twist, queue_size=10)
         self.odometry_subscriber = rospy.Subscriber('/' + self.name + '/odom', Odometry, self.update_pose)
 
+        rospy.on_shutdown(self.stop) # tell ros to call stop when the program is terminated
+
         prx = '/' + self.name + '/proximity/'
         self.proximity_sensors_name = [
             prx + 'left',
@@ -70,6 +72,9 @@ class Thymar:
         self.covariance = None
         self.target_found = False
         self.target = {}
+        self.grid_width = None
+        self.grid_height = None
+        self.grid_resolution = None
         self.occupancy_grid = np.array([-1.])
         self.plot_grid = False
 
@@ -82,12 +87,12 @@ class Thymar:
         self.orientation = mv.to_positive_angle(self.orientation)
 
     def update_occupancy_grid(self, data):
-        self.gird_width = data.info.width
+        self.grid_width = data.info.width
         self.grid_height = data.info.height
         self.grid_resolution = data.info.resolution
 
         self.occupancy_grid = np.array(data.data)
-        self.occupancy_grid = self.occupancy_grid.reshape(self.grid_height,self.gird_width)
+        self.occupancy_grid = self.occupancy_grid.reshape(self.grid_height,self.grid_width)
 
     def update_target(self,data):
         self.target = Target(data.pose.position.x,data.pose.position.y,data.pose.position.z)
@@ -115,18 +120,22 @@ class Thymar:
     def update_proximity_rear_right(self, data):
         self.proximity[6] = data.range
 
+    def stop(self):
+        self.velocity_publisher.publish(Twist())  # set velocities to 0
+        self.rate.sleep()
+
     def run(self):
+        # self.controller = ThymarController(self.grid_resolution)
         self.controller = ExplorerController()
-        # self.controller = ThymarController()
         
         while not rospy.is_shutdown():
             vel = self.controller.run(self.proximity, self.position, self.orientation)
-            # vel = self.controller.run(self.position, self.orientation, self.occupancy_grid)
 
             # The y axis is plotted flipped. Plots the traversable terrain vs unexplored/obstacles OR the target if found.
-            if(self.occupancy_grid.shape[0]>1 and self.plot_grid):
+            if(self.occupancy_grid.shape[0] > 1 and self.plot_grid):
                 plt.imshow(self.occupancy_grid, interpolation='nearest')
                 plt.pause(0.05)
+
             self.velocity_publisher.publish(vel)
             self.rate.sleep()
 

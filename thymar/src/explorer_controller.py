@@ -23,7 +23,8 @@ class ExplorerController:
 		self.velocity = Twist()
 
 		rand_init_dir = random.randint(0, 7)
-		self.init_orientation = pi / 4 * rand_init_dir
+		# self.init_orientation = pi / 4 * rand_init_dir
+		self.init_orientation = 0
 
 		self.velocity.linear.x = 0.13
 
@@ -34,7 +35,7 @@ class ExplorerController:
 		return mv.to_positive_angle(orientation - mid_range + step*rand_dir)
 
 	def explore(self, proximity, position, orientation):
-		self.velocity.angular.z = 0.
+		self.velocity.angular.z = 0
 
 		if self.obstacle_controller.is_obstacle_present(proximity):
 			self.EXPLORING = False
@@ -43,7 +44,7 @@ class ExplorerController:
 			self.velocity.linear.x = 0.
 			return
 
-		self.velocity.linear.x = 0.10
+		self.velocity.linear.x = 0.15
 
 	def run(self, proximity, position, orientation):
 		
@@ -79,7 +80,7 @@ class ExplorerController:
 		# Rotate in the new orientation and restart exploration
 		if self.OBSTACLE_AVOIDED:
 			done, vel = self.motion_controller.move(position, orientation,
-													position, target_orientation=self.new_orientation,
+													position, target_orientation=None,
 													max_orientation_speed=.75
 													)
 			self.velocity.linear.x = vel.linear.x

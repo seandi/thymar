@@ -1,0 +1,3 @@
+roslaunch thymar_description thymar_gazebo_bringup.launch name:=thymar gui:=false world:=indoor1
+roslaunch thymar_lidar lidar_processor.launch name:=thymar
+rosrun thymar Thymar.py _name:=thymar

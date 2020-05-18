@@ -1,4 +1,6 @@
 import rospy
+import random
+import numpy as np
 import movement_utils as mv
 from pid import PID
 from geometry_msgs.msg import Twist, Pose, Point
@@ -69,9 +71,11 @@ class WallController:
 
 		if abs(angular_vel) < 0.01:
 			self.PERPENDICULAR=True
-			self.target_orientation = (orientation+pi)%(2*pi)
+			# orientation+pi set orientation to 180 degress opposite to the wall
+			randomness = random.uniform(np.deg2rad(-80), np.deg2rad(+80)) # we add randomness to the rotation
+			self.target_orientation = (orientation+pi+randomness)%(2*pi)
 
-	def turn_180(self, proximity, position, orientation):
+	def turn_away(self, proximity, position, orientation):
 		done , vel = self.motion_controller.move(position,orientation,
 			position,target_orientation=self.target_orientation,
 			max_orientation_speed=.75
@@ -136,7 +140,7 @@ class WallController:
 			self.align_perpendicular(proximity, position, orientation)
 
 		if not self.ROTATED and self.PERPENDICULAR:
-			self.turn_180(proximity, position, orientation)
+			self.turn_away(proximity, position, orientation)
 			
 		if not self.MAX_RANGE and self.ROTATED:
 			self.move_max_range(proximity, position, orientation)
