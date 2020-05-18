@@ -33,7 +33,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 	if(this->first){
 		this->world_point_cloud=new_point_cloud;
 
-		this->obstacles_point_cloud = this->directionalFilter(new_point_cloud, "z", -0.05, 5.0, terrain_cloud);
+		this->obstacles_point_cloud = this->directionalFilter(new_point_cloud, "z", -0.03, 5.0, terrain_cloud);
 		this->terrain_point_cloud = terrain_cloud;
 
 
@@ -43,7 +43,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 		
 		this->world_point_cloud+=rotated_new_point_cloud;
 
-		pcl::PointCloud<pcl::PointXYZ> filtered_new_point_cloud = this->directionalFilter(rotated_new_point_cloud, "z", -0.05, 5.0, terrain_cloud);
+		pcl::PointCloud<pcl::PointXYZ> filtered_new_point_cloud = this->directionalFilter(rotated_new_point_cloud, "z", -0.03, 5.0, terrain_cloud);
 		this->obstacles_point_cloud+=filtered_new_point_cloud;
 		this->terrain_point_cloud+=terrain_cloud;
 		
