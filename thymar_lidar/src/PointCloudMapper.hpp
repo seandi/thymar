@@ -17,6 +17,10 @@ struct Pose2d{
 	double x,y,theta;
 };
 
+struct Velocity{
+	double linear, angular;
+};
+
 struct SphereModel{
 	float x,y,radius;
 };

@@ -7,6 +7,7 @@
 #include "nav_msgs/Odometry.h"
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Pose.h>
+#include <geometry_msgs/Twist.h>
 #include <tf/tf.h>
 #include <string>
 #include "PointCloudMapper.hpp"
@@ -22,6 +23,7 @@ private:
     ros::Publisher pointcloud_publisher;
     ros::Publisher grid_publisher;
     ros::Subscriber odometry_subscriber;
+    ros::Subscriber velocity_subscriber;
     ros::Publisher obstacles_publisher;
     ros::Publisher terrain_publisher;
     ros::Publisher target_marker_publisher;
@@ -32,6 +34,7 @@ private:
     PointCloudMapper* mapper;
     pcl::PointCloud<pcl::PointXYZ> cloud;
     Pose2d pose2d;
+    Velocity velocity;
     nav_msgs::OccupancyGrid grid;
     bool new_point_cloud = false;
     SphereModel target_model;
@@ -41,6 +44,7 @@ public:
 	ThymarLidar(int argc, char** argv, float hz=10, int grid_width=10, int grid_height=10, float grid_resolution=0.05);
 	~ThymarLidar(){delete mapper;};
 	void processLidarMeasurement(const pcl::PCLPointCloud2ConstPtr& cloud_msg);
+	void updateVelocities(const geometry_msgs::Twist::ConstPtr& msg);
 	void parseOdometry(const nav_msgs::Odometry::ConstPtr& msg);
 	void publishTargetMarker();
 	void run();
@@ -53,12 +57,13 @@ ThymarLidar::ThymarLidar(int argc, char** argv, float hz, int grid_width, int gr
 		// READ PARAMETERS
 		ros::NodeHandle nh_private("~");
     	nh_private.getParam("name", this->name);
-    	
-
+    	 
+        this->odometry_subscriber = this->nh.subscribe<nav_msgs::Odometry>("/" +this->name +"/odom", 5, &ThymarLidar::parseOdometry, this);
+        this->velocity_subscriber = this->nh.subscribe<geometry_msgs::Twist>("/" +this->name +"/cmd_vel", 5, &ThymarLidar::updateVelocities, this);
 		this->pointcloud_subscriber = this->nh.subscribe<pcl::PCLPointCloud2>("/" +this->name +"/velodyne_points", 5, &ThymarLidar::processLidarMeasurement, this);
+        
         this->pointcloud_publisher = this->nh.advertise<pcl::PointCloud<pcl::PointXYZ> > ("/" +this->name +"/world_map", 1);
         this->grid_publisher = this->nh.advertise<nav_msgs::OccupancyGrid>("/" +this->name +"/occupancy_grid", 1);
-        this->odometry_subscriber = this->nh.subscribe<nav_msgs::Odometry>("/" +this->name +"/odom", 5, &ThymarLidar::parseOdometry, this);
 
         this->obstacles_publisher = this->nh.advertise<pcl::PointCloud<pcl::PointXYZ> > ("/" +this->name +"/obstacles", 1);
         this->terrain_publisher = this->nh.advertise<pcl::PointCloud<pcl::PointXYZ> > ("/" +this->name +"/traversable_terrain", 1);
@@ -72,15 +77,23 @@ ThymarLidar::ThymarLidar(int argc, char** argv, float hz, int grid_width, int gr
 		this->target_marker_publisher = this->nh.advertise<visualization_msgs::Marker>("/" +this->name +"/target_marker", 1);
 
 		std::cout << "Lidar PointCloud Processor node initialised for robot " << this->name << std::endl;
-	
-
 
 	}
 
 void ThymarLidar::processLidarMeasurement(const pcl::PCLPointCloud2ConstPtr& cloud_msg){
 
-		pcl::fromPCLPointCloud2(*cloud_msg, this->cloud);
-		this->new_point_cloud = true;
+		if(this->velocity.angular == 0){
+			pcl::fromPCLPointCloud2(*cloud_msg, this->cloud);
+			this->new_point_cloud = true;
+		}
+		
+	}
+
+void ThymarLidar::updateVelocities(const geometry_msgs::Twist::ConstPtr& msg){
+
+		this->velocity.linear = msg->linear.x;
+		this->velocity.angular = msg->angular.z;
+
 	}
 
 void ThymarLidar::parseOdometry(const nav_msgs::Odometry::ConstPtr& msg){
@@ -109,8 +122,8 @@ void ThymarLidar::run(){
 
 		if(this->new_point_cloud){
 			this->new_point_cloud=false;
-			this->mapper->addPointCloud(this->cloud, this->pose2d);
 
+			this->mapper->addPointCloud(this->cloud, this->pose2d);
 			
 			this->grid.data = this->mapper->getOccupancyGrid();
 			this->grid_publisher.publish(this->grid);
