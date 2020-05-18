@@ -55,8 +55,17 @@ NOTE: at the moment, there is a bug for which if the target is immediately visib
 This is a list of currently available worlds:
 - empty
 - arena
+- easy_1
+- easy_2
+- easy_3
 - indoor_1
+- indoor_2
+- indoor_3
 - outdoor_1
+- outdoor_2
+- outdoor_3
 
 In `thymar_description/launch/models`, some useful models can be found for creating custom worlds. In order to work properly, the project needs a world which maximum size is 20x20 and that is completely closed (so the robot cannot exit from the world and keep going infinitely).
 
+The image shows some of the worlds listed above.
+![Available worlds](https://i.imgur.com/v3mFKZF.png)
