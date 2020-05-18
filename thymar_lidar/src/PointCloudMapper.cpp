@@ -16,7 +16,7 @@ PointCloudMapper::PointCloudMapper(int grid_width, int grid_height, float grid_r
 		float yf = (float) (y-this->grid_height/2.)*this->grid_resolution;
 
 		
-		if((pow(xf,2) + pow(yf,2)) < pow(0.45,2)){
+		if((pow(xf,2) + pow(yf,2)) < pow(0.40,2)){
 			this->occupancy_grid[y*this->grid_width+x]=0;
 		}
 		

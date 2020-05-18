@@ -42,7 +42,7 @@ private:
     bool target_found = false;
 
 public:
-	ThymarLidar(int argc, char** argv, float hz=10, int grid_width=10, int grid_height=10, float grid_resolution=0.05);
+	ThymarLidar(int argc, char** argv, float hz=10, int grid_width=20, int grid_height=20, float grid_resolution=0.05);
 	~ThymarLidar(){delete mapper;};
 	void processLidarMeasurement(const pcl::PCLPointCloud2ConstPtr& cloud_msg);
 	void updateVelocities(const geometry_msgs::Twist::ConstPtr& msg);

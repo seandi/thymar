@@ -4,7 +4,7 @@
   <arg name="name" default="thymar"/>
   <arg name="grid_width" default="10.0"/>
 
-  <node pkg="tf" type="static_transform_publisher" name="map_base_link" args="-5.0 -5.0 0 0 0 0 /$(arg name)/odom /map 100" output="screen"/>
+  <node pkg="tf" type="static_transform_publisher" name="map_base_link" args="-10.0 -10.0 0 0 0 0 /$(arg name)/odom /map 100" output="screen"/>
   <node name="Lidar_processor" pkg="thymar_lidar" type="thymar_lidar" output="screen">
   	<param name="name" value="$(arg name)" />
   </node>

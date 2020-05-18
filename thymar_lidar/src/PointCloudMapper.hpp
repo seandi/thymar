@@ -48,7 +48,7 @@ private:
 		pcl::PointCloud<pcl::PointXYZ>& outliers_cloud
 	);
 public:
-	PointCloudMapper(int grid_width=10, int grid_height=10, float grid_resolution=0.05);
+	PointCloudMapper(int grid_width=20, int grid_height=20, float grid_resolution=0.05);
 	void addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cloud, Pose2d pose2d);
 	std::vector<float> fitSphere(pcl::PointCloud<pcl::PointXYZ> input_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr inliers_cloud=NULL);
 	std::vector<float> locateSphere(pcl::PointCloud<pcl::PointXYZ> input_cloud);
