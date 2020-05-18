@@ -36,6 +36,7 @@ private:
     Pose2d pose2d;
     Velocity velocity;
     nav_msgs::OccupancyGrid grid;
+    bool first_point_cloud = true;
     bool new_point_cloud = false;
     SphereModel target_model;
     bool target_found = false;
@@ -61,7 +62,8 @@ ThymarLidar::ThymarLidar(int argc, char** argv, float hz, int grid_width, int gr
         this->odometry_subscriber = this->nh.subscribe<nav_msgs::Odometry>("/" +this->name +"/odom", 5, &ThymarLidar::parseOdometry, this);
         this->velocity_subscriber = this->nh.subscribe<geometry_msgs::Twist>("/" +this->name +"/cmd_vel", 5, &ThymarLidar::updateVelocities, this);
 		this->pointcloud_subscriber = this->nh.subscribe<pcl::PCLPointCloud2>("/" +this->name +"/velodyne_points", 5, &ThymarLidar::processLidarMeasurement, this);
-        
+        this->first_point_cloud = true;
+
         this->pointcloud_publisher = this->nh.advertise<pcl::PointCloud<pcl::PointXYZ> > ("/" +this->name +"/world_map", 1);
         this->grid_publisher = this->nh.advertise<nav_msgs::OccupancyGrid>("/" +this->name +"/occupancy_grid", 1);
 
@@ -82,9 +84,10 @@ ThymarLidar::ThymarLidar(int argc, char** argv, float hz, int grid_width, int gr
 
 void ThymarLidar::processLidarMeasurement(const pcl::PCLPointCloud2ConstPtr& cloud_msg){
 
-		if(this->velocity.angular == 0){
+		if(this->first_point_cloud or this->velocity.angular == 0){
 			pcl::fromPCLPointCloud2(*cloud_msg, this->cloud);
 			this->new_point_cloud = true;
+			this->first_point_cloud = false;
 		}
 		
 	}
