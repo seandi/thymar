@@ -8,7 +8,7 @@
   <xacro:thymio/>
   
   <xacro:include filename="$(find velodyne_description)/urdf/VLP-16.urdf.xacro"/>
-  <VLP-16 parent="base_link" name="velodyne" topic="velodyne_points" hz="10" samples="440" gpu="${gpu}" lasers="64" min_range="0.15" max_range="3.0">
+  <VLP-16 parent="base_link" name="velodyne" topic="velodyne_points" hz="10" samples="440" gpu="${gpu}" lasers="64" collision_range="0.09" min_range="0.10" max_range="3.0">
     <origin xyz="0.020 0 0.053" rpy="0 0 0" />
 
   </VLP-16>
