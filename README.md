@@ -2,44 +2,61 @@
 
 ## Requirements
 
-- thymio_description package (already intalled):
-  1. git clone https://github.com/jeguzzi/ros-aseba.git
-  2. copy the thymio_description folder to the /src folder
-  3. build the package with catkin build
+- `thymio_description` package (already intalled on the VM):
+  1. `cd catkin_ws/src/`
+  2. `git clone https://github.com/jeguzzi/ros-aseba.git`
   
-- velodyne plugin (to be installed):
-  1. move to catkin_ws/src/
-  2. git clone https://bitbucket.org/DataspeedInc/velodyne_simulator.git
-  3. catkin build
+- `velodyne` plugin (to be installed):
+  1. `cd catkin_ws/src/`
+  2. `git clone https://bitbucket.org/DataspeedInc/velodyne_simulator.git`
   
-- ros_pcl (to be installed):
-  1. move to catkin_ws/src/
-  2. git clone https://github.com/ros-perception/perception_pcl.git
-  3. catkin build
+- `ros_pcl` (to be installed):
+  1. `cd catkin_ws/src/`
+  2. `git clone https://github.com/ros-perception/perception_pcl.git`
   
+  
+
 ## How to Install
-To install the packages
-1. move to catkin_ws/src/
-2. git clone https://github.com/seandi/thymar.git
-3. catkin build
+
+To install the Thymar package, after the requirements have been satisfied:
+1. `cd catkin_ws/src/`
+2. `git clone https://github.com/seandi/thymar.git`
+3. `catkin build`
+4. `re.`
+
+
 
 ## Overview
-The repo contains the ros packages for the Thymar robot. Inside the thymar folder there are two packages: 
-1. the thymar_description is the ros package containing all the models and launch file for similating in Gazebo the Thymar robot
-2. the thymar package contains the scripts for controlling the robot, see [readme](thymar/README.md)
+
+The repo contains the ROS packages for the Thymar robot. Inside the project folder there are two packages: 
+1. the `thymar_description` package contains all the models and launch files for simulating the robot in Gazebo
+1. the `thymar_lidar` package performs LIDAR computations and publishes the rostopics to be shown in RViz
+2. the `thymar` package contains the scripts for controlling the robot, see [readme](thymar/README.md)
+
+
 
 ### How to run
-The gazebo simulation of the robot can be launched as follows
-`roslaunch thymar_description thymar_gazebo_bringup.launch name:=thymar world:=empty`
-then launch the node processing the lidar pointcloud:
-`roslaunch thymar_lidar lidar_processor.launch name:=thymar`
-and finally launch the main script:
-`rosrun thymar Thymar.py _name:=thymar`
-NOTE: cuurently there is a bug for which if the target is immediately visible when the lidar node is started, the Thymar.py script may never receive its position.
 
-## Visualizing the pointcloud
-To visualize the point cloud from the Thymar:
-1. open a new terminal and start `rviz`
-2. change *fixed frame* from *map* to *name_of_the_robot/velodyne*
-3. click add -> scroll down to PointCloud2 
-4. under pointcloud2 set topic=*name_of_the_robot/velodyne_points*
+The Gazebo simulation of the Thymar robot can be launched as follows (with or without the GUI):  
+`roslaunch thymar_description thymar_gazebo_bringup.launch name:=thymar gui:=false world:=indoor_1`  
+
+Then launch the node processing the LIDAR Point Cloud, which will automatically also starts RViz for visualizing the result:  
+`roslaunch thymar_lidar lidar_processor.launch name:=thymar`  
+
+Finally, launch the main script that actually controls the robot movements:  
+`rosrun thymar Thymar.py _name:=thymar`
+
+NOTE: at the moment, there is a bug for which if the target is immediately visible when the lidar node is started, the Thymar.py script may never receive its position.
+
+
+
+## Worlds
+
+This is a list of currently available worlds:
+- empty
+- arena
+- indoor_1
+- outdoor_1
+
+In `thymar_description/launch/models`, some useful models can be found for creating custom worlds. In order to work properly, the project needs a world which maximum size is 20x20 and that is completely closed (so the robot cannot exit from the world and keep going infinitely).
+
