@@ -132,11 +132,15 @@ void ThymarLidar::run(){
 			this->grid_publisher.publish(this->grid);
 
 			pcl::PointCloud<pcl::PointXYZ> world_map = this->mapper->getWorldPointCloud();
+			world_map.header.frame_id = "/" +this->name +"/odom";
         	this->pointcloud_publisher.publish(world_map);
 
         	pcl::PointCloud<pcl::PointXYZ> obstacles_map = this->mapper->getObstaclesPointCloud();
+        	obstacles_map.header.frame_id = "/" +this->name +"/odom";
         	this->obstacles_publisher.publish(obstacles_map);
+
         	pcl::PointCloud<pcl::PointXYZ> terrain_map = this->mapper->getTerrainPointCloud();
+        	terrain_map.header.frame_id = "/" +this->name +"/odom";
         	this->terrain_publisher.publish(terrain_map);
 
         	if(!this->target_found && this->mapper->isTargetFound()){
@@ -155,6 +159,13 @@ void ThymarLidar::run(){
 		this->rate.sleep();
 	}
 }
+/*
+void ThymarLidar::PublishPointCloud(pcl::PointCloud<pcl::PointXYZ> point_cloud){
+	pcl::PointCloud<pcl::PointXYZ>::Ptr msg (new pcl::PointCloud<pcl::PointXYZ>);
+	msg->header.frame_id = "/" +this->name +"/odom";
+	msg->points.push_back (pcl::PointXYZ(1.0, 2.0, 3.0));
+	this->pointcloud_publisher.publish(point_cloud);
+}*/
 
 void ThymarLidar::publishTargetMarker(){
 	visualization_msgs::Marker marker;
