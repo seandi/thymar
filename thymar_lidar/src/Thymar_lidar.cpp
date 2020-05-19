@@ -46,7 +46,7 @@ public:
 	void processLidarMeasurement(const pcl::PCLPointCloud2ConstPtr& cloud_msg);
 	void updateVelocities(const geometry_msgs::Twist::ConstPtr& msg);
 	void parseOdometry(const nav_msgs::Odometry::ConstPtr& msg);
-	void publishTargetMarker();
+	visualization_msgs::Marker getTargetMarker();
 	void run();
        
 };
@@ -118,6 +118,9 @@ void ThymarLidar::parseOdometry(const nav_msgs::Odometry::ConstPtr& msg){
 	}
 
 void ThymarLidar::run(){
+
+	visualization_msgs::Marker target_marker;
+	
 	while(ros::ok()){
 
 		if(this->new_point_cloud){
@@ -147,9 +150,12 @@ void ThymarLidar::run(){
         		std::cout << "Model found in (" << this->target_model.x << ","  << this->target_model.y << ") " 
 				<< "with radius: "<< this->target_model.radius 
 				<< std::endl;
-				this->publishTargetMarker();
-
+				target_marker = this->getTargetMarker();
         	}
+
+			if(this->target_found)
+				this->target_marker_publisher.publish(target_marker);
+
 		}
 
 		ros::spinOnce();
@@ -159,10 +165,10 @@ void ThymarLidar::run(){
 
 
 
-void ThymarLidar::publishTargetMarker(){
+visualization_msgs::Marker ThymarLidar::getTargetMarker(){
 	visualization_msgs::Marker marker;
 	
-	marker.header.frame_id = "/thymar/base_link";
+	marker.header.frame_id =  "/" +this->name +"/odom";
 	//marker.header.stamp = ros::Time::now();
 
 	marker.ns = "basic_shapes";
@@ -190,9 +196,9 @@ void ThymarLidar::publishTargetMarker(){
 	marker.color.b = 0.0f;
 	marker.color.a = 1.0;
 
-	marker.lifetime = ros::Duration(0.0);;
+	marker.lifetime = ros::Duration(0.0);
 
-	this->target_marker_publisher.publish(marker);
+	return marker;
 }
 
 
