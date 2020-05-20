@@ -36,7 +36,7 @@ class Thymar:
         self.velocity_publisher = rospy.Publisher('/' + self.name + '/cmd_vel', Twist, queue_size=10)
         self.odometry_subscriber = rospy.Subscriber('/' + self.name + '/odom', Odometry, self.update_pose)
 
-        rospy.on_shutdown(self.stop) # tell ros to call stop when the program is terminated
+        rospy.on_shutdown(self.on_exit) # tell ros what to do when CTRL+C is pressed
 
         prx = '/' + self.name + '/proximity/'
         self.proximity_sensors_name = [
@@ -76,7 +76,7 @@ class Thymar:
         self.grid_height = None
         self.grid_resolution = None
         self.occupancy_grid = np.array([-1.])
-        self.plot_grid = False
+        self.plot_grid = True
 
     def update_pose(self, data):
         self.position = data.pose.pose.position
@@ -124,16 +124,32 @@ class Thymar:
         self.velocity_publisher.publish(Twist())  # set velocities to 0
         self.rate.sleep()
 
+    def log(self):
+        rospy.loginfo('')
+        rospy.loginfo('grid resol = ' + str(self.grid_resolution))
+        rospy.loginfo('grid shape = ' + str(self.occupancy_grid.shape))
+        rospy.loginfo('position = ' + str(self.position))
+        rospy.loginfo('orientation = ' + str(self.orientation))
+        if self.target_found:
+            rospy.loginfo('target = x:' + str(self.target.x) + ', y:' + str(self.target.y))
+        np.save('map.npy', self.occupancy_grid)
+        
+    def on_exit(self):
+        self.stop()
+        self.log()
+
+
     def run(self):
         # self.controller = ThymarController(self.grid_resolution)
         self.controller = ExplorerController()
+        plt.figure(figsize = (2,2))
         
         while not rospy.is_shutdown():
             vel = self.controller.run(self.proximity, self.position, self.orientation)
 
-            # The y axis is plotted flipped. Plots the traversable terrain vs unexplored/obstacles OR the target if found.
+            # Plots the map
             if(self.occupancy_grid.shape[0] > 1 and self.plot_grid):
-                plt.imshow(self.occupancy_grid, interpolation='nearest')
+                plt.imshow(np.flipud(self.occupancy_grid), interpolation='nearest')
                 plt.pause(0.05)
 
             self.velocity_publisher.publish(vel)
