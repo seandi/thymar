@@ -60,7 +60,7 @@ class ThymarController:
 	def has_facing_obstacle(self, grid, x, y, theta, robot_visibility = None):
 		""" Given the current pose, check if the robot is facing an obstacle. """
 
-		robot_visibility = robot_visibility or self.robot_visibility
+		robot_visibility = min(robot_visibility, 2.5) or self.robot_visibility
 		step = self.grid_resolution
 
 		obstacle_facing = False
@@ -98,12 +98,12 @@ class ThymarController:
 				obstacle_distance = distance
 				obstacle_odom = ahead_odom
 				break
-
+		
 		return obstacle_facing, obstacle_distance, obstacle_odom
 
 
 
-	def explore_random(self, position, orientation, occupancy_grid, step = 0.1, stucked_max = 8):
+	def explore_random(self, position, orientation, occupancy_grid, steering_step = 5, stucked_max = 8):
 		""" Randomly explores the environment avoiding obstacles. """
 
 		current_x = position.x
@@ -118,6 +118,7 @@ class ThymarController:
 			self.velocity.angular.z = 0.
 
 		else: # look for a free path by turning around
+			rospy.loginfo('Facing obstacle at ({:.2f}, {:.2f}), {:.2f} meters far (theta {:.2f})'.format(obs_odom[0], obs_odom[1], obs_dist, current_theta))
 
 			self.stucked_count += 1
 			if self.stucked_count > stucked_max: # prevent the robot to be stucked in trying the same orientations over and over
@@ -127,24 +128,32 @@ class ThymarController:
 			left_distances = []
 			right_distances = []
 			for i in range(1, 45, 5):
+				# please note that here the robot has double the normal visibility range
 				_, dist_left, _ = self.has_facing_obstacle(occupancy_grid, current_x, current_y, current_theta + np.deg2rad(i), robot_visibility=2*self.robot_visibility)
 				_, dist_right, _ = self.has_facing_obstacle(occupancy_grid, current_x, current_y, current_theta - np.deg2rad(i), robot_visibility=2*self.robot_visibility)
 				left_distances.append(dist_left or 4)
 				right_distances.append(dist_right or 4)
 
 			# once both sides are evaluated, the robot tries to turn the preferred way for finding a free path
+			deg_delta = steering_step if np.mean(left_distances) > np.mean(right_distances) else -steering_step # positive or negative steering based on more free way
+			deg_delta *= 1 / self.robot_visibility # multiplier for adjusting steering step on visibility distance (default is 1 meters visibility = `steering_step` degrees) 
 			previous_obs_dist = 0
-			deg_delta = 5 if np.mean(left_distances) > np.mean(right_distances) else -5
-			while obs_present and obs_dist * 1.8 >= previous_obs_dist: # allows to take still-blocked ways that are better than before
+			steering_count = 0
+			while obs_present and obs_dist * 1.5 >= previous_obs_dist: # allows to take still-blocked ways that are better than before
+				steering_count += 1
 				previous_obs_dist = obs_dist
-				current_theta += np.deg2rad(deg_delta) # step-by-step research (could be improved by adding decay on `deg_delta`)
-				obs_present, obs_dist, obs_odom = self.has_facing_obstacle(occupancy_grid, current_x, current_y, current_theta)
+				if steering_count % (360/deg_delta) == 0: # every time a searching round is complete...
+					deg_delta /= 2 # ... steering angle decays 
+				current_theta += np.deg2rad(deg_delta) # step-by-step research
+				# please note that here the robot has double the normal visibility range
+				obs_present, obs_dist, obs_odom = self.has_facing_obstacle(occupancy_grid, current_x, current_y, current_theta, robot_visibility=2*self.robot_visibility)
 
 			# stops the robot and set goal for reaching the computed theta
 			self.goal = Pose2D(current_x, current_y, current_theta)
 			self.status = Status.CHASING_GOAL
 			self.velocity.linear.x = 0.
 			self.velocity.angular.z = 0.
+			rospy.loginfo('Steering for reaching theta {:.2f}...'.format(current_theta))
 
 
 	

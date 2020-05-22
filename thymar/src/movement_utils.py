@@ -12,16 +12,16 @@ class Status(Enum):
     CHASING_GOAL = 3
 
 
-class Target:
-    def __init__(self, pose = Pose2D(), radius = None):
-        self.pose = pose
-        self.radius = radius
-
 class Pose2D:
     def __init__(self, x = None, y = None, theta = None):
         self.x = x
         self.y = y
         self.theta = theta
+
+class Target:
+    def __init__(self, pose = Pose2D(), radius = None):
+        self.pose = pose
+        self.radius = radius
 
 
 def euclidean_distance(position, target):
@@ -62,7 +62,7 @@ def circular_motion(speed, radius, positive_orientation=True):
 	return velocity
 
 class ToTargetPController:
-	def __init__(self, linear_speed, orientation_speed, linear_threshold=0.05, orientation_eps=0.005):
+	def __init__(self, linear_speed, orientation_speed, linear_threshold=0.05, orientation_eps=0.008):
 		self.gain1 = linear_speed
 		self.gain2 = orientation_speed
 		self.linear_eps = linear_threshold

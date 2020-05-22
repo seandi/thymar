@@ -22,13 +22,15 @@ from explorer_controller import ExplorerController
 
 
 class Thymar:
+    
     def __init__(self, rate=10 ):
+        
         rospy.init_node('Thymar', anonymous=True)
+        
         self.rate = rospy.Rate(rate)
-
         self.name = rospy.get_param("~name")
 
-        print("Process for "+self.name+" has started!")
+        print("Node for " + self.name + " initialized")
 
         self.velocity_publisher = rospy.Publisher('/' + self.name + '/cmd_vel', Twist, queue_size=10)
         self.odometry_subscriber = rospy.Subscriber('/' + self.name + '/odom', Odometry, self.update_pose)
@@ -95,8 +97,9 @@ class Thymar:
         pose = Pose2D(data.pose.position.x,data.pose.position.y)
         radius = data.pose.position.z
         self.target = Target(pose, radius)
+        if not self.target_found: # only works the first time the target is found
+            rospy.loginfo("Target found in ({0},{1}) with radius {2}!".format(self.target.pose.x,self.target.pose.y,self.target.radius))
         self.target_found = True
-        print("Target found in ({0},{1}) with radius {2}!".format(self.target.pose.x,self.target.pose.y,self.target.radius))
 
     def update_proximity_left(self, data):
         self.proximity[0] = data.range
@@ -135,10 +138,15 @@ class Thymar:
         
     def on_exit(self):
         self.stop()
-        self.log()
+        # self.log()
+
+    def ready(self):
+        return self.position and self.orientation and self.grid_resolution
 
 
     def run(self):
+
+        print('Controller is running!')
 
         controller = ThymarController(self.grid_resolution)
 
@@ -167,7 +175,13 @@ class Thymar:
 
 if __name__ == '__main__':
     try:
-        thymar= Thymar()
+        thymar = Thymar()
+
+        print('Waiting for subscribers to be ready...')
+        while(not thymar.ready()):
+            pass
+
         thymar.run()
+
     except rospy.ROSInterruptException as e:
         pass
