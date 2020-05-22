@@ -14,7 +14,7 @@ def get_drawable_map(map, target_x = 200, target_y = 200):
     target_x_index = slice(target_x - (target_dim//2), target_x + (target_dim//2))
     target_y_index = slice(target_y - (target_dim//2), target_y + (target_dim//2))
 
-    drawable_map = np.flipud(map)
+    drawable_map = np.copy(map)
     drawable_map[drawable_map == -1] = color_unknown # recoloring unknown
     drawable_map[drawable_map == 0] = color_known # recoloring known
     drawable_map[drawable_map == 100] = color_obstacle # recoloring obstacles
@@ -34,5 +34,5 @@ print('map shape: ', map.shape)
 
 
 plt.figure(figsize = (6,6))
-plt.imshow(get_drawable_map(map), interpolation='nearest')
+plt.imshow(get_drawable_map(map), interpolation='nearest', origin='lower')
 plt.pause(20)

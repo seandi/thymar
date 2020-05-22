@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 import rospy
 from tf.transformations import euler_from_quaternion
 from geometry_msgs.msg import Twist, Pose
@@ -14,13 +15,9 @@ from thymar_controller import ThymarController
 
 
 import movement_utils as mv
+from movement_utils import Pose2D, Target, Status
 from explorer_controller import ExplorerController
 
-class Target:
-    def __init__(self,x,y,radius):
-        self.x = x
-        self.y = y
-        self.radius = radius
 
 
 
@@ -71,7 +68,7 @@ class Thymar:
         self.proximity = [0.12] * 7
         self.covariance = None
         self.target_found = False
-        self.target = {}
+        self.target = Target()
         self.grid_width = None
         self.grid_height = None
         self.grid_resolution = None
@@ -95,9 +92,11 @@ class Thymar:
         self.occupancy_grid = self.occupancy_grid.reshape(self.grid_height,self.grid_width)
 
     def update_target(self,data):
-        self.target = Target(data.pose.position.x,data.pose.position.y,data.pose.position.z)
+        pose = Pose2D(data.pose.position.x,data.pose.position.y)
+        radius = data.pose.position.z
+        self.target = Target(pose, radius)
         self.target_found = True
-        print("Target found in ({0},{1}) with radius {2}!".format(self.target.x,self.target.y,self.target.radius))
+        print("Target found in ({0},{1}) with radius {2}!".format(self.target.pose.x,self.target.pose.y,self.target.radius))
 
     def update_proximity_left(self, data):
         self.proximity[0] = data.range
@@ -131,7 +130,7 @@ class Thymar:
         rospy.loginfo('position = ' + str(self.position))
         rospy.loginfo('orientation = ' + str(self.orientation))
         if self.target_found:
-            rospy.loginfo('target = x:' + str(self.target.x) + ', y:' + str(self.target.y))
+            rospy.loginfo('target = x:' + str(self.target.pose.x) + ', y:' + str(self.target.pose.y))
         np.save('map.npy', self.occupancy_grid)
         
     def on_exit(self):
@@ -140,20 +139,30 @@ class Thymar:
 
 
     def run(self):
-        # self.controller = ThymarController(self.grid_resolution)
-        self.controller = ExplorerController()
-        plt.figure(figsize = (2,2))
-        
+
+        controller = ThymarController(self.grid_resolution)
+
         while not rospy.is_shutdown():
-            vel = self.controller.run(self.proximity, self.position, self.orientation)
+            if self.target_found:
+                controller.target = self.target
 
-            # Plots the map
-            if(self.occupancy_grid.shape[0] > 1 and self.plot_grid):
-                plt.imshow(np.flipud(self.occupancy_grid), interpolation='nearest')
-                plt.pause(0.05)
-
+            vel = controller.run(self.position, self.orientation, self.proximity, self.occupancy_grid)
             self.velocity_publisher.publish(vel)
             self.rate.sleep()
+        
+        # self.controller = ExplorerController()
+        # plt.figure(figsize = (2,2))
+
+        # while not rospy.is_shutdown():
+        #     vel = self.controller.run(self.proximity, self.position, self.orientation)
+
+        #     # Plots the map
+        #     if(self.occupancy_grid.shape[0] > 1 and self.plot_grid):
+        #         plt.imshow(np.flipud(self.occupancy_grid), interpolation='nearest',origin='lower')
+        #         plt.pause(0.05)
+
+        #     self.velocity_publisher.publish(vel)
+        #     self.rate.sleep()
 
 
 if __name__ == '__main__':

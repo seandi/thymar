@@ -1,8 +1,28 @@
+from enum import Enum
 import rospy
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Point
 
 from math import pow, atan2, sqrt, pi
+
+
+class Status(Enum):
+    EXPLORING_RANDOM = 1
+    EXPLORING_UNKNOWN = 2
+    CHASING_GOAL = 3
+
+
+class Target:
+    def __init__(self, pose = Pose2D(), radius = None):
+        self.pose = pose
+        self.radius = radius
+
+class Pose2D:
+    def __init__(self, x = None, y = None, theta = None):
+        self.x = x
+        self.y = y
+        self.theta = theta
+
 
 def euclidean_distance(position, target):
 		return sqrt(pow((target.x - position.x), 2) +
@@ -42,13 +62,13 @@ def circular_motion(speed, radius, positive_orientation=True):
 	return velocity
 
 class ToTargetPController:
-	def __init__(self, linear_speed, orientation_speed, linear_threshold=0.05, orientation_eps=0.01):
+	def __init__(self, linear_speed, orientation_speed, linear_threshold=0.05, orientation_eps=0.005):
 		self.gain1 = linear_speed
 		self.gain2 = orientation_speed
 		self.linear_eps = linear_threshold
 		self.orientation_eps = orientation_eps
 
-	def move(self,position, orientation, target, target_orientation=None,
+	def move(self, position, orientation, target, target_orientation=None,
 	 max_orientation_speed=None, max_linear_speed=None):
 		velocity = Twist()
 		done = True
