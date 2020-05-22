@@ -148,7 +148,7 @@ class Thymar:
 
         print('Controller is running!')
 
-        controller = ThymarController(self.grid_resolution)
+        controller = ThymarController(self.grid_resolution, Status.EXPLORING_COVERAGE)
 
         while not rospy.is_shutdown():
             if self.target_found:

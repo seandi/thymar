@@ -9,12 +9,27 @@ from movement_utils import Pose2D, Target, Status
 
 
 
+class GraphNode:
+	def __init__(self, pose, g_score, prev_node_pose, goal_pose):
+		self.pose = pose
+		self.g_score = g_score # actual cost
+		self.h_score = 0 if goal_pose == None else mv.euclidean_distance_tuple(self.pose, goal_pose) # heuristic cost
+		self.prev_node_pose = prev_node_pose
+
+	def f_score(self):
+		return self.g_score + self.h_score # priority cost
+
+	def __str__(self):
+		return str(self.pose) + ", g:" + str(self.g_score) + ", f:" + "{:.3f}".format(self.f_score()) + ", prev:" + str(self.prev_node_pose)
+
+
+
 class ThymarController:
 	""" Manages the map exploration until the target is reached, then go back to the initial position. """
 	
 
-	def __init__(self, grid_resolution,
-				robot_visibility = 1.1, robot_width = 0.2, default_status = Status.EXPLORING_RANDOM):
+	def __init__(self, grid_resolution, default_status,
+				robot_visibility = 1.1, robot_width = 0.2):
 
 		self.velocity = Twist()
 		self.grid_resolution = grid_resolution
@@ -27,7 +42,10 @@ class ThymarController:
 		
 		self.target = Target() # target found in the map
 		self.goal = Pose2D() # goal to reach if self.status == Status.CHASING_GOAL
+
 		self.stucked_count = 0 # used to count how many times the robot get stucked
+		self.planning_count = 0 # used to count how many timesteps are elapsed since the last path planning
+		self.planning_path = [] # tracks path to follow
 
 
 
@@ -102,6 +120,111 @@ class ThymarController:
 		return obstacle_facing, obstacle_distance, obstacle_odom
 
 
+	# ------------------- EXPLORE COVERING UTILS
+
+
+	def get_neighbourhood(self, grid, grid_pose, obstacle_identifier = 100):
+
+		# due to the robot width, cells next to the obstacles must be ignored for robot traversing
+		# in practice, this could be divided by 2 but path tracking will be easier without doing so
+		collision_cells = np.ceil(self.robot_width/self.grid_resolution).astype(int)
+
+		nrows = grid.shape[0]
+		ncols = grid.shape[1]
+		row = grid_pose[1] # y=row
+		col = grid_pose[0] # x=col
+		neighbourhood = []
+
+		# When reading this code, please remember that while pose is expressed as (X,Y),
+		# the matrix indexing for `grid` is instead to be done as (Y,X).
+		# Moreover, the Y is flipped in the map (see maps images), then for moving the
+		# robot UP we actually need to increment Y (row_index + 1)
+		# instead of decreasing it (such as it would happen in a normal matrix).
+
+		if col > 0 and grid[row, col - min(col, collision_cells)] != obstacle_identifier:
+			neighbourhood.append((col - 1, row)) # left
+		if col < ncols - 1 and grid[row, col + min(ncols - col - 1, collision_cells)] != obstacle_identifier:
+			neighbourhood.append((col + 1, row)) # right
+
+		if row > 0 and grid[row - min(row, collision_cells), col] != obstacle_identifier:
+			neighbourhood.append((col, row - 1)) # down
+		if row < nrows - 1 and grid[row + min(nrows - row - 1, collision_cells), col] != obstacle_identifier:
+			neighbourhood.append((col, row + 1)) # up
+
+		if col > 0 and row > 0 and grid[row - min(row, collision_cells), col - min(col, collision_cells)] != obstacle_identifier:
+			neighbourhood.append((col - 1, row - 1)) # diagonal left-down
+		if col > 0 and row < nrows - 1 and grid[row - min(nrows - row - 1, collision_cells), col - min(col, collision_cells)] != obstacle_identifier:
+			neighbourhood.append((col - 1, row + 1)) # diagonal left-up
+
+		if col < ncols - 1 and row > 0 and grid[row - min(row, collision_cells), col + min(ncols - col - 1, collision_cells)] != obstacle_identifier:
+			neighbourhood.append((col + 1, row - 1)) # diagonal right-down
+		if col < ncols - 1 and row < nrows - 1 and grid[row + min(nrows - row - 1, collision_cells), col + min(ncols - col - 1, collision_cells)] != obstacle_identifier:
+			neighbourhood.append((col + 1, row + 1)) # diagonal right-up
+
+		# print(grid_pose, neighbourhood)
+		return neighbourhood
+
+
+	def get_complete_path(self, nodes_set, node):
+		path = [node.pose]
+		while node.prev_node_pose != None:
+			path.append(node.prev_node_pose)
+			node = nodes_set[node.prev_node_pose]
+		return path[::-1]
+
+
+	def path_planning(self, grid, start_odom, goal_odom, goal_identifier = None):
+		""" Applies A* or Dijkstra depending on the fact that `goal_odom` is specified or not """
+
+		start_grid = self.odom_to_grid(start_odom)
+		goal_grid = None if goal_odom == None else self.odom_to_grid(goal_odom)
+		
+		if goal_grid == None and goal_identifier == None: 
+			raise Exception('You must have either a goal pose or color.')
+
+		open_set = dict() # nodes to explore
+		closed_set = dict() # already explored nodes
+		
+		start_node = GraphNode(start_grid, 0, None, goal_grid)
+		open_set[start_node.pose] = start_node
+
+
+		while len(open_set) > 0:
+
+			# get the node with minimum f_score
+			chosen_idx = min(open_set, key = lambda dict_idx: open_set[dict_idx].f_score()) 
+			current_node = open_set[chosen_idx]
+			
+			success = True if goal_grid == None or current_node.pose == goal_grid else False
+			success = True if success and (goal_identifier == None or grid[current_node.pose[::-1]] == goal_identifier) else False
+
+			if success: 
+				return [self.grid_to_odom(p) for p in self.get_complete_path(closed_set, current_node)] # success: goal reached
+
+			del open_set[chosen_idx]
+			closed_set[chosen_idx] = current_node
+
+			neighbourhood = self.get_neighbourhood(grid, current_node.pose) # list of neighbours poses (tuple)
+			
+			for i, neighbour in enumerate(neighbourhood):
+			
+				if neighbour in closed_set:
+					continue # already explored
+
+				g_score = current_node.g_score + mv.euclidean_distance_tuple(current_node.pose, neighbour)
+
+				if neighbour not in open_set: # new node
+					open_set[neighbour] = GraphNode(neighbour, g_score, current_node.pose, goal_grid)
+				
+				elif open_set[neighbour].g_score > g_score: # best path for reaching the node `neighbour` 
+						open_set[neighbour].g_score = g_score
+						open_set[neighbour].prev_node_pose = current_node.pose
+
+		return None # failure: open_set is empty but goal was never reached
+
+
+	# ------------------- CONTROLLERS
+
 
 	def explore_random(self, position, orientation, occupancy_grid, steering_step = 5, stucked_max = 8):
 		""" Randomly explores the environment avoiding obstacles. """
@@ -156,6 +279,44 @@ class ThymarController:
 			rospy.loginfo('Steering for reaching theta {:.2f}...'.format(current_theta))
 
 
+	def explore_covering(self, position, orientation, occupancy_grid, recomputation = 5, skip_poses = 3):
+		""" Explores the environment while always managing to reach the nearest undiscovered position in the map. """
+
+		if self.planning_count % recomputation == 0: # path planning is only recomputed every `recomputation` timesteps
+			rospy.loginfo('Recomputing path for reaching unknown areas...')
+			sx = position.x	
+			sy = position.y
+			self.planning_path = self.path_planning(occupancy_grid, (sx, sy), None, -1)
+			gx = self.planning_path[-1][0]
+			gy = self.planning_path[-1][1]
+
+			rospy.loginfo('Computed path from from ({:.2f}, {:.2f}) to ({:.2f}, {:.2f}) of total lenght = {}'
+							.format(sx, sy, gx, gy, len(self.planning_path)))
+
+			# rospy.loginfo('First 5 poses of path (total lenght {}) from ({:.2f}, {:.2f}) to ({:.2f}, {:.2f})'
+			# 				.format(len(self.planning_path), sx, sy, gx, gy) + str(self.planning_path[:5]))
+		
+		# for kinematics reasons, skips some of the planned poses and retrieve the next one to be reached
+		for _ in range(skip_poses):
+			if len(self.planning_path) > 1: # at least 2
+				next_pose = self.planning_path.pop(0)
+			else:
+				break
+
+		next_pose = self.planning_path.pop(0)
+		self.planning_count += 1
+
+		# next_pose = self.planning_path[4]
+
+		# stops the robot and set goal for reaching the pose
+		self.status = Status.CHASING_GOAL
+		self.goal = Pose2D(next_pose[0], next_pose[1], None)
+		self.velocity.linear.x = 0.
+		self.velocity.angular.z = 0.
+		rospy.loginfo('Current goal is ({:.2f}, {:.2f})'.format(next_pose[0], next_pose[1]))
+
+
+
 	
 	def run(self, position, orientation, proximity, occupancy_grid):
 		""" Returns proper velocities accordingly to the current status. """
@@ -168,6 +329,7 @@ class ThymarController:
 			self.velocity.angular.z = vel.angular.z
 
 			if done:
+				rospy.loginfo('Intermediate goal reached')
 				self.status = self.default_status
 		
 
@@ -175,8 +337,8 @@ class ThymarController:
 			self.explore_random(position, orientation, occupancy_grid)
 
 
-		elif self.status == Status.EXPLORING_UNKNOWN:
-			pass
+		elif self.status == Status.EXPLORING_COVERAGE:
+			self.explore_covering(position, orientation, occupancy_grid)
 
 
 		return self.velocity
