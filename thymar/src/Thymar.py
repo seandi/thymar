@@ -163,7 +163,7 @@ class Thymar:
 
         controller = ThymarController(self.grid_resolution, Status.EXPLORING_COVERAGE)
 
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and not controller.status == Status.END:
             if self.target_found:
                 controller.target = self.target
 

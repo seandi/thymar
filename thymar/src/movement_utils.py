@@ -12,6 +12,8 @@ class Status(Enum):
     EXPLORING_RANDOM = 1
     EXPLORING_COVERAGE = 2
     CHASING_GOAL = 3
+    RETURNING = 4
+    END = 5
 
 
 class Pose2D:
@@ -82,11 +84,11 @@ class ToTargetPController:
 
 
 	def move(self, position, orientation, target, target_orientation=None,
-	 max_orientation_speed=None, max_linear_speed=None):
+	 max_orientation_speed=None, max_linear_speed=None, custom_distance_tollerance = None):
 		velocity = Twist()
 		done = True
 
-		if euclidean_distance(position, target) >= self.linear_eps:
+		if euclidean_distance(position, target) >= (custom_distance_tollerance or self.linear_eps):
 
 			vector = (target.x - position.x, target.y - position.y)
 			norm = np.linalg.norm([vector[0],vector[1]])

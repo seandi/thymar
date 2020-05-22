@@ -38,6 +38,7 @@ class ThymarController:
 
 		self.default_status = default_status
 		self.status = default_status
+		self.next_status = None
 		self.motion_controller = mv.ToTargetPController(linear_speed=0.15, orientation_speed = 2.5)
 		
 		self.target = Target() # target found in the map
@@ -123,45 +124,52 @@ class ThymarController:
 	# ------------------- EXPLORE COVERING UTILS
 
 
-	def get_neighbourhood(self, grid, grid_pose, obstacle_identifier = 100):
-
-		# due to the robot width, cells next to the obstacles must be ignored for robot traversing
-		# in practice, this could be divided by 2 but path tracking will be easier without doing so
-		collision_cells = np.ceil(self.robot_width/self.grid_resolution/2).astype(int)
-
-		nrows = grid.shape[0]
-		ncols = grid.shape[1]
-		row = grid_pose[1] # y=row
-		col = grid_pose[0] # x=col
-		neighbourhood = []
-
+	def is_valid_neighbour(self, grid, gpose, obstacle_identifier = 100):
 		# When reading this code, please remember that while pose is expressed as (X,Y),
 		# the matrix indexing for `grid` is instead to be done as (Y,X).
 		# Moreover, the Y is flipped in the map (see maps images), then for moving the
 		# robot UP we actually need to increment Y (row_index + 1)
 		# instead of decreasing it (such as it would happen in a normal matrix).
 
-		if col > 0 and grid[row, col - min(col, collision_cells)] != obstacle_identifier:
-			neighbourhood.append((col - 1, row)) # left
-		if col < ncols - 1 and grid[row, col + min(ncols - col - 1, collision_cells)] != obstacle_identifier:
-			neighbourhood.append((col + 1, row)) # right
+		# Due to the robot width, cells next to the obstacles must be ignored for robot traversing
+		collision = np.ceil(self.robot_width/self.grid_resolution/2).astype(int)
+		
+		cells = set([gpose])
+		for _ in range(collision): # explore all adjacent cells for a maximum of `collision` layers
+			tmp =  set([])
+			for _, tup in enumerate(cells):
+				x = tup[0]
+				y = tup[1]
+				tmp.add((x - 1, y)) # left
+				tmp.add((x + 1, y)) # right
+				tmp.add((x, y - 1)) # down
+				tmp.add((x, y + 1)) # up
+				tmp.add((x - 1, y - 1)) # diagonal left-down
+				tmp.add((x - 1, y + 1)) # diagonal left-up
+				tmp.add((x + 1, y - 1)) # diagonal right-down
+				tmp.add((x + 1, y + 1)) # diagonal right-up
 
-		if row > 0 and grid[row - min(row, collision_cells), col] != obstacle_identifier:
-			neighbourhood.append((col, row - 1)) # down
-		if row < nrows - 1 and grid[row + min(nrows - row - 1, collision_cells), col] != obstacle_identifier:
-			neighbourhood.append((col, row + 1)) # up
+			for _, tup in enumerate(tmp): # checking cells for validity
+				if grid[tup[1], tup[0]] == obstacle_identifier:
+					return False
 
-		if col > 0 and row > 0 and grid[row - min(row, collision_cells), col - min(col, collision_cells)] != obstacle_identifier:
-			neighbourhood.append((col - 1, row - 1)) # diagonal left-down
-		if col > 0 and row < nrows - 1 and grid[row - min(nrows - row - 1, collision_cells), col - min(col, collision_cells)] != obstacle_identifier:
-			neighbourhood.append((col - 1, row + 1)) # diagonal left-up
+			cells = cells.union(tmp)
 
-		if col < ncols - 1 and row > 0 and grid[row - min(row, collision_cells), col + min(ncols - col - 1, collision_cells)] != obstacle_identifier:
-			neighbourhood.append((col + 1, row - 1)) # diagonal right-down
-		if col < ncols - 1 and row < nrows - 1 and grid[row + min(nrows - row - 1, collision_cells), col + min(ncols - col - 1, collision_cells)] != obstacle_identifier:
-			neighbourhood.append((col + 1, row + 1)) # diagonal right-up
+		return True
 
-		# print(grid_pose, neighbourhood)
+
+	def get_neighbourhood(self, grid, grid_pose):
+		x = grid_pose[0] # x=col
+		y = grid_pose[1] # y=row
+		neighbourhood = []
+		neighbourhood.append((x - 1, y)) # left
+		neighbourhood.append((x + 1, y)) # right
+		neighbourhood.append((x, y - 1)) # down
+		neighbourhood.append((x, y + 1)) # up
+		neighbourhood.append((x - 1, y - 1)) # diagonal left-down
+		neighbourhood.append((x - 1, y + 1)) # diagonal left-up
+		neighbourhood.append((x + 1, y - 1)) # diagonal right-down
+		neighbourhood.append((x + 1, y + 1)) # diagonal right-up
 		return neighbourhood
 
 
@@ -210,6 +218,9 @@ class ThymarController:
 			
 				if neighbour in closed_set:
 					continue # already explored
+
+				if not self.is_valid_neighbour(grid, neighbour):
+					continue
 
 				g_score = current_node.g_score + mv.euclidean_distance_tuple(current_node.pose, neighbour)
 
@@ -274,12 +285,12 @@ class ThymarController:
 			# stops the robot and set goal for reaching the computed theta
 			self.goal = Pose2D(current_x, current_y, current_theta)
 			self.status = Status.CHASING_GOAL
-			self.velocity.linear.x = 0.
-			self.velocity.angular.z = 0.
+			self.next_status = Status.EXPLORING_RANDOM
+			self.velocity = Twist()
 			rospy.loginfo('Steering for reaching theta {:.2f}...'.format(current_theta))
 
 
-	def explore_covering(self, position, orientation, occupancy_grid, recomputation = 5, skip_poses = 0):
+	def explore_covering(self, position, orientation, occupancy_grid, recomputation = 5, skip_poses = 3):
 		""" Explores the environment while always managing to reach the nearest undiscovered position in the map. """
 
 		# path planning is only recomputed every `recomputation` timesteps
@@ -288,12 +299,17 @@ class ThymarController:
 			sx = position.x	
 			sy = position.y
 			self.planning_path = self.path_planning(occupancy_grid, (sx, sy), None, -1)
+			
+			if len(self.planning_path) == 0:
+				rospy.loginfo('Cannot find a feasible path for unknown areas')
+				self.status = Status.END
+				return
+
 			gx = self.planning_path[-1][0]
 			gy = self.planning_path[-1][1]
 
 			rospy.loginfo('Computed path from from ({:.2f}, {:.2f}) to ({:.2f}, {:.2f}) of total lenght = {}'
 							.format(sx, sy, gx, gy, len(self.planning_path)))
-
 
 		# for kinematics reasons, skips some of the planned poses and retrieve the next one to be reached
 		for _ in range(skip_poses + 1):
@@ -307,35 +323,83 @@ class ThymarController:
 
 		# stops the robot and set goal for reaching the pose
 		self.status = Status.CHASING_GOAL
+		self.next_status = Status.EXPLORING_COVERAGE
 		self.goal = Pose2D(next_pose[0], next_pose[1], None)
-		self.velocity.linear.x = 0.
-		self.velocity.angular.z = 0.
+		self.velocity = Twist()
+		rospy.loginfo('Current goal is ({:.2f}, {:.2f})'.format(next_pose[0], next_pose[1]))
+
+	
+	def chase_planning(self, position, orientation, grid, goal, goal_orientation, 
+						next_status, tollerance = None, recomputation = 5, skip_poses = 3):
+		
+		# path planning is only recomputed every `recomputation` timesteps
+		if len(self.planning_path) == 0 or (recomputation != -1 and self.planning_count % recomputation == 0): 
+			rospy.loginfo('Recomputing path for chasing ({:.2f}, {:.2f}) ...'.format(goal.x, goal.y))
+			sx = position.x	
+			sy = position.y
+			gx = goal.x
+			gy = goal.y
+			self.planning_path = self.path_planning(grid, (sx, sy), (gx, gy), None)
+			
+			if len(self.planning_path) == 0:
+				rospy.loginfo('Cannot find a feasible path for chasing ({:.2f}, {:.2f}) ...'.format(goal.x, goal.y))
+				self.status = Status.END
+				return
+
+			gx = self.planning_path[-1][0]
+			gy = self.planning_path[-1][1]
+
+			rospy.loginfo('Computed path from from ({:.2f}, {:.2f}) to ({:.2f}, {:.2f}) of total lenght = {}'
+							.format(sx, sy, gx, gy, len(self.planning_path)))
+
+		# for kinematics reasons, skips some of the planned poses and retrieve the next one to be reached
+		for _ in range(skip_poses + 1):
+			if len(self.planning_path) > 1: # at least 2
+				next_pose = self.planning_path.pop(0)
+			else:
+				break
+
+		next_pose = self.planning_path.pop(0)
+		self.planning_count += 1
+
+		# stops the robot and set goal for reaching the pose
+		self.status = Status.CHASING_GOAL
+		self.next_status = next_status
+		self.goal = Pose2D(next_pose[0], next_pose[1], None)
+		self.velocity = Twist()
 		rospy.loginfo('Current goal is ({:.2f}, {:.2f})'.format(next_pose[0], next_pose[1]))
 
 
+	def chase_simple(self, position, orientation, goal, goal_orientation, tollerance = None):
+		done, vel = self.motion_controller.move(position, orientation,
+												goal, target_orientation=goal_orientation,
+												max_linear_speed=.15, max_orientation_speed=.75,
+												custom_distance_tollerance=tollerance)
+		self.velocity.linear.x = vel.linear.x
+		self.velocity.angular.z = vel.angular.z
 
-	
+		if done:
+			rospy.loginfo('Intermediate goal reached')
+			self.status = self.next_status
+
+
+
 	def run(self, position, orientation, proximity, occupancy_grid):
 		""" Returns proper velocities accordingly to the current status. """
 
-		if self.status == Status.CHASING_GOAL:
-			done, vel = self.motion_controller.move(position, orientation,
-													self.goal, target_orientation=self.goal.theta,
-													max_linear_speed=.15, max_orientation_speed=.75)
-			self.velocity.linear.x = vel.linear.x
-			self.velocity.angular.z = vel.angular.z
+		if self.target.pose.x != None and self.target.pose.y != None:
+			self.chase_planning(position, orientation, occupancy_grid, self.target.pose, None, Status.RETURNING, tollerance=0.30)
 
-			if done:
-				rospy.loginfo('Intermediate goal reached')
-				self.status = self.default_status
-		
+		elif self.status == Status.CHASING_GOAL:
+			self.chase_simple(position, orientation, self.goal, self.goal.theta)
 
 		elif self.status == Status.EXPLORING_RANDOM:
 			self.explore_random(position, orientation, occupancy_grid)
 
-
 		elif self.status == Status.EXPLORING_COVERAGE:
 			self.explore_covering(position, orientation, occupancy_grid)
 
+		elif self.status == Status.RETURNING:
+			self.chase_planning(position, orientation, occupancy_grid, Pose2D(0, 0), 0, Status.END)
 
 		return self.velocity
