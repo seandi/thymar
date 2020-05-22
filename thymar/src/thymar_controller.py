@@ -127,7 +127,7 @@ class ThymarController:
 
 		# due to the robot width, cells next to the obstacles must be ignored for robot traversing
 		# in practice, this could be divided by 2 but path tracking will be easier without doing so
-		collision_cells = np.ceil(self.robot_width/self.grid_resolution).astype(int)
+		collision_cells = np.ceil(self.robot_width/self.grid_resolution/2).astype(int)
 
 		nrows = grid.shape[0]
 		ncols = grid.shape[1]
@@ -279,10 +279,11 @@ class ThymarController:
 			rospy.loginfo('Steering for reaching theta {:.2f}...'.format(current_theta))
 
 
-	def explore_covering(self, position, orientation, occupancy_grid, recomputation = 5, skip_poses = 3):
+	def explore_covering(self, position, orientation, occupancy_grid, recomputation = 5, skip_poses = 0):
 		""" Explores the environment while always managing to reach the nearest undiscovered position in the map. """
 
-		if self.planning_count % recomputation == 0: # path planning is only recomputed every `recomputation` timesteps
+		# path planning is only recomputed every `recomputation` timesteps
+		if len(self.planning_path) == 0 or (recomputation != -1 and self.planning_count % recomputation == 0): 
 			rospy.loginfo('Recomputing path for reaching unknown areas...')
 			sx = position.x	
 			sy = position.y
@@ -293,11 +294,9 @@ class ThymarController:
 			rospy.loginfo('Computed path from from ({:.2f}, {:.2f}) to ({:.2f}, {:.2f}) of total lenght = {}'
 							.format(sx, sy, gx, gy, len(self.planning_path)))
 
-			# rospy.loginfo('First 5 poses of path (total lenght {}) from ({:.2f}, {:.2f}) to ({:.2f}, {:.2f})'
-			# 				.format(len(self.planning_path), sx, sy, gx, gy) + str(self.planning_path[:5]))
-		
+
 		# for kinematics reasons, skips some of the planned poses and retrieve the next one to be reached
-		for _ in range(skip_poses):
+		for _ in range(skip_poses + 1):
 			if len(self.planning_path) > 1: # at least 2
 				next_pose = self.planning_path.pop(0)
 			else:
@@ -305,8 +304,6 @@ class ThymarController:
 
 		next_pose = self.planning_path.pop(0)
 		self.planning_count += 1
-
-		# next_pose = self.planning_path[4]
 
 		# stops the robot and set goal for reaching the pose
 		self.status = Status.CHASING_GOAL

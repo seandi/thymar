@@ -2,10 +2,8 @@
 
 import rospy
 from tf.transformations import euler_from_quaternion
-from geometry_msgs.msg import Twist, Pose
-from geometry_msgs.msg import Point
-from nav_msgs.msg import Odometry
-from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import Twist, Pose, Point, PoseStamped
+from nav_msgs.msg import Odometry, OccupancyGrid, Path
 from sensor_msgs.msg import Range
 from visualization_msgs.msg import Marker
 from math import pi
@@ -64,6 +62,8 @@ class Thymar:
 
         self.occupancy_grid_subscriber = rospy.Subscriber('/' + self.name + '/occupancy_grid', OccupancyGrid, self.update_occupancy_grid)
         self.target_marker_subscriber = rospy.Subscriber('/' + self.name + '/target_marker', Marker, self.update_target)
+
+        self.plan_publisher = rospy.Publisher('/' + self.name + '/plan', Path, queue_size=10)
 
         self.position = Point()
         self.orientation = 0
@@ -143,6 +143,19 @@ class Thymar:
     def ready(self):
         return self.position and self.orientation and self.grid_resolution
 
+    def publish_path_plan(self, plan):
+        if plan != None and len(plan) > 2:
+            path = Path()
+            path.header.frame_id = '/' + self.name + '/odom'
+            path.header.stamp = rospy.get_rostime()
+            for p in plan:
+                pose = PoseStamped()
+                pose.pose.position.x = p[0]
+                pose.pose.position.y = p[1]
+                path.poses.append(pose)
+            self.plan_publisher.publish(path)
+            self.rate.sleep()
+
 
     def run(self):
 
@@ -157,6 +170,9 @@ class Thymar:
             vel = controller.run(self.position, self.orientation, self.proximity, self.occupancy_grid)
             self.velocity_publisher.publish(vel)
             self.rate.sleep()
+
+            self.publish_path_plan(controller.planning_path)
+
         
         # self.controller = ExplorerController()
         # plt.figure(figsize = (2,2))

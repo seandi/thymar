@@ -86,34 +86,34 @@ class ToTargetPController:
 		velocity = Twist()
 		done = True
 
-		# -- Turning towards the target
+		if euclidean_distance(position, target) >= self.linear_eps:
 
-		vector = (target.x - position.x, target.y - position.y)
-		norm = np.linalg.norm([vector[0],vector[1]])
-		cos_angle = np.math.acos(vector[0]/norm)
-		angle_to_face_target = cos_angle if np.sign(vector[1]) > 0 else -cos_angle
+			vector = (target.x - position.x, target.y - position.y)
+			norm = np.linalg.norm([vector[0],vector[1]])
+			cos_angle = np.math.acos(vector[0]/norm)
+			angle_to_face_target = cos_angle if np.sign(vector[1]) > 0 else -cos_angle
 
-		if abs(min_angle_diff(orientation,angle_to_face_target)) >= self.orientation_eps * 5:
-			# print('steering')
-			velocity.linear.x = 0.
-			velocity.angular.z = self.gain2 * min_angle_diff(orientation,angle_to_face_target)
-			if max_orientation_speed is not None:
-				module = min(abs(velocity.angular.z), max_orientation_speed)
-				velocity.angular.z *= module / abs(velocity.angular.z)
+			if abs(min_angle_diff(orientation,angle_to_face_target)) >= self.orientation_eps * 5:
+				# -- Turning towards the target
+				# print('steering')
+				velocity.linear.x = 0.
+				velocity.angular.z = self.gain2 * min_angle_diff(orientation,angle_to_face_target)
+				if max_orientation_speed is not None:
+					module = min(abs(velocity.angular.z), max_orientation_speed)
+					velocity.angular.z *= module / abs(velocity.angular.z)
 
-			done = False
+				done = False
 
-		# -- Moving towards the target
+			else:
+				# -- Moving towards the target
+				# print('moving')
+				velocity.linear.x = self.gain1 #* euclidean_distance(position, target) 
+				velocity.angular.z = 0.
+				if max_linear_speed is not None:
+					velocity.linear.x = min(velocity.linear.x, max_linear_speed)
+				done = False
 
-		elif euclidean_distance(position, target) >= self.linear_eps:
-			# print('moving')
-			velocity.linear.x = self.gain1 #* euclidean_distance(position, target) 
-			velocity.angular.z = 0.
-			if max_linear_speed is not None:
-				velocity.linear.x = min(velocity.linear.x, max_linear_speed)
-			done = False
-
-		# # -- Turning towards the target orientation
+		# -- Turning towards the target orientation
 		
 		if target_orientation is not None and abs(min_angle_diff(orientation,target_orientation)) >= self.orientation_eps:
 			velocity.linear.x = 0.
