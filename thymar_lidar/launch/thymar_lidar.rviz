@@ -3,7 +3,8 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /TF1/Frames1
       Splitter Ratio: 0.5996705293655396
     Tree Height: 548
   - Class: rviz/Selection
@@ -162,19 +163,83 @@ Visualization Manager:
       Unreliable: false
       Value: false
     - Class: rviz/TF
-      Enabled: false
+      Enabled: true
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        map:
+          Value: false
+        thymar/base_link:
+          Value: true
+        thymar/ground_left_link:
+          Value: false
+        thymar/ground_right_link:
+          Value: false
+        thymar/laser_link:
+          Value: false
+        thymar/left_wheel_link:
+          Value: false
+        thymar/odom:
+          Value: true
+        thymar/proximity_center_left_link:
+          Value: false
+        thymar/proximity_center_link:
+          Value: false
+        thymar/proximity_center_right_link:
+          Value: false
+        thymar/proximity_left_link:
+          Value: false
+        thymar/proximity_rear_left_link:
+          Value: false
+        thymar/proximity_rear_right_link:
+          Value: false
+        thymar/proximity_right_link:
+          Value: false
+        thymar/right_wheel_link:
+          Value: false
+        thymar/velodyne:
+          Value: false
+        thymar/velodyne_base_link:
+          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        thymar/odom:
+          map:
+            {}
+          thymar/base_link:
+            thymar/ground_left_link:
+              {}
+            thymar/ground_right_link:
+              {}
+            thymar/laser_link:
+              {}
+            thymar/left_wheel_link:
+              {}
+            thymar/proximity_center_left_link:
+              {}
+            thymar/proximity_center_link:
+              {}
+            thymar/proximity_center_right_link:
+              {}
+            thymar/proximity_left_link:
+              {}
+            thymar/proximity_rear_left_link:
+              {}
+            thymar/proximity_rear_right_link:
+              {}
+            thymar/proximity_right_link:
+              {}
+            thymar/right_wheel_link:
+              {}
+            thymar/velodyne_base_link:
+              thymar/velodyne:
+                {}
       Update Interval: 0
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:

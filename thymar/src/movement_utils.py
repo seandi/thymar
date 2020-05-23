@@ -87,15 +87,17 @@ class ToTargetPController:
 	 max_orientation_speed=None, max_linear_speed=None, custom_distance_tollerance = None):
 		velocity = Twist()
 		done = True
+		distance_current = euclidean_distance(position, target)
+		distance_eps = custom_distance_tollerance or self.linear_eps
 
-		if euclidean_distance(position, target) >= (custom_distance_tollerance or self.linear_eps):
+		if distance_current >= distance_eps:
 
 			vector = (target.x - position.x, target.y - position.y)
 			norm = np.linalg.norm([vector[0],vector[1]])
 			cos_angle = np.math.acos(vector[0]/norm)
 			angle_to_face_target = cos_angle if np.sign(vector[1]) > 0 else -cos_angle
 
-			if abs(min_angle_diff(orientation,angle_to_face_target)) >= self.orientation_eps * 5:
+			if distance_current >= distance_eps * 2 and abs(min_angle_diff(orientation,angle_to_face_target)) >= self.orientation_eps * 5:
 				# -- Turning towards the target
 				# print('steering')
 				velocity.linear.x = 0.
@@ -116,8 +118,8 @@ class ToTargetPController:
 				done = False
 
 		# -- Turning towards the target orientation
-		
-		if target_orientation is not None and abs(min_angle_diff(orientation,target_orientation)) >= self.orientation_eps:
+		if done and target_orientation is not None and abs(min_angle_diff(orientation,target_orientation)) >= self.orientation_eps:
+			# print('final steering')
 			velocity.linear.x = 0.
 			velocity.angular.z = self.gain2 * min_angle_diff(orientation,target_orientation)
 			if max_orientation_speed is not None:

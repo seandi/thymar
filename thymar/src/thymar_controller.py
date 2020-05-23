@@ -28,7 +28,7 @@ class ThymarController:
 	""" Manages the map exploration until the target is reached, then go back to the initial position. """
 	
 
-	def __init__(self, grid_resolution, default_status,
+	def __init__(self, grid_resolution, default_status, status_after_reaching_target = Status.RETURNING,
 				robot_visibility = 1.1, robot_width = 0.2):
 
 		self.velocity = Twist()
@@ -39,10 +39,13 @@ class ThymarController:
 		self.default_status = default_status
 		self.status = default_status
 		self.next_status = None
+		self.status_after_reaching_target = status_after_reaching_target
 		self.motion_controller = mv.ToTargetPController(linear_speed=0.15, orientation_speed = 2.5)
 		
+		self.target_found = False
 		self.target = Target() # target found in the map
 		self.goal = Pose2D() # goal to reach if self.status == Status.CHASING_GOAL
+		self.goal_distance_tollerance = None
 
 		self.stucked_count = 0 # used to count how many times the robot get stucked
 		self.planning_count = 0 # used to count how many timesteps are elapsed since the last path planning
@@ -150,7 +153,10 @@ class ThymarController:
 				tmp.add((x + 1, y + 1)) # diagonal right-up
 
 			for _, tup in enumerate(tmp): # checking cells for validity
-				if grid[tup[1], tup[0]] == obstacle_identifier:
+				try:
+					if grid[tup[1], tup[0]] == obstacle_identifier:
+						return False
+				except IndexError:
 					return False
 
 			cells = cells.union(tmp)
@@ -182,13 +188,16 @@ class ThymarController:
 
 
 	def path_planning(self, grid, start_odom, goal_odom, goal_identifier = None):
-		""" Applies A* or Dijkstra depending on the fact that `goal_odom` is specified or not """
+		""" 
+			Applies A* or Dijkstra depending on the fact that `goal_odom` is specified or not. 
+			If not, then a `goal_identifier` (as integer) is needed for identifying what to look for in the grid. 
+		"""
 
 		start_grid = self.odom_to_grid(start_odom)
 		goal_grid = None if goal_odom == None else self.odom_to_grid(goal_odom)
 		
 		if goal_grid == None and goal_identifier == None: 
-			raise Exception('You must have either a goal pose or color.')
+			raise Exception('You must have either a goal pose or goal_identifier.')
 
 		open_set = dict() # nodes to explore
 		closed_set = dict() # already explored nodes
@@ -220,7 +229,7 @@ class ThymarController:
 					continue # already explored
 
 				if not self.is_valid_neighbour(grid, neighbour):
-					continue
+					continue # obstacle or out of the map
 
 				g_score = current_node.g_score + mv.euclidean_distance_tuple(current_node.pose, neighbour)
 
@@ -231,7 +240,7 @@ class ThymarController:
 						open_set[neighbour].g_score = g_score
 						open_set[neighbour].prev_node_pose = current_node.pose
 
-		return None # failure: open_set is empty but goal was never reached
+		return [] # failure: open_set is empty but goal was never reached
 
 
 	# ------------------- CONTROLLERS
@@ -283,9 +292,10 @@ class ThymarController:
 				obs_present, obs_dist, obs_odom = self.has_facing_obstacle(occupancy_grid, current_x, current_y, current_theta, robot_visibility=2*self.robot_visibility)
 
 			# stops the robot and set goal for reaching the computed theta
-			self.goal = Pose2D(current_x, current_y, current_theta)
+			self.next_status = self.status
 			self.status = Status.CHASING_GOAL
-			self.next_status = Status.EXPLORING_RANDOM
+			self.goal = Pose2D(current_x, current_y, current_theta)
+			self.goal_distance_tollerance = None
 			self.velocity = Twist()
 			rospy.loginfo('Steering for reaching theta {:.2f}...'.format(current_theta))
 
@@ -300,9 +310,10 @@ class ThymarController:
 			sy = position.y
 			self.planning_path = self.path_planning(occupancy_grid, (sx, sy), None, -1)
 			
-			if len(self.planning_path) == 0:
-				rospy.loginfo('Cannot find a feasible path for unknown areas')
-				self.status = Status.END
+			if self.planning_path == None or len(self.planning_path) == 0:
+				rospy.loginfo('Cannot find a feasible path for unknown areas. Exploration changes to random.')
+				self.status = Status.EXPLORING_RANDOM
+				self.velocity = Twist() # stops the robot
 				return
 
 			gx = self.planning_path[-1][0]
@@ -321,19 +332,20 @@ class ThymarController:
 		next_pose = self.planning_path.pop(0)
 		self.planning_count += 1
 
-		# stops the robot and set goal for reaching the pose
+		# set goal for reaching the pose while setting next status the same as now
+		self.next_status = self.status
 		self.status = Status.CHASING_GOAL
-		self.next_status = Status.EXPLORING_COVERAGE
 		self.goal = Pose2D(next_pose[0], next_pose[1], None)
-		self.velocity = Twist()
+		self.goal_distance_tollerance = None
+		self.velocity = Twist() # stops the robot
 		rospy.loginfo('Current goal is ({:.2f}, {:.2f})'.format(next_pose[0], next_pose[1]))
 
 	
 	def chase_planning(self, position, orientation, grid, goal, goal_orientation, 
-						next_status, tollerance = None, recomputation = 5, skip_poses = 3):
+						status_after_finish, tollerance = None, recomputation = 5, skip_poses = 3):
 		
 		# path planning is only recomputed every `recomputation` timesteps
-		if len(self.planning_path) == 0 or (recomputation != -1 and self.planning_count % recomputation == 0): 
+		if len(self.planning_path) == 0 or (recomputation > 1 and self.planning_count % recomputation == 0): 
 			rospy.loginfo('Recomputing path for chasing ({:.2f}, {:.2f}) ...'.format(goal.x, goal.y))
 			sx = position.x	
 			sy = position.y
@@ -354,7 +366,7 @@ class ThymarController:
 
 		# for kinematics reasons, skips some of the planned poses and retrieve the next one to be reached
 		for _ in range(skip_poses + 1):
-			if len(self.planning_path) > 1: # at least 2
+			if len(self.planning_path) > skip_poses:
 				next_pose = self.planning_path.pop(0)
 			else:
 				break
@@ -362,36 +374,49 @@ class ThymarController:
 		next_pose = self.planning_path.pop(0)
 		self.planning_count += 1
 
-		# stops the robot and set goal for reaching the pose
+		# set goal for reaching the pose while setting next status as specified, if the final goal has been reached
+		finished = True if len(self.planning_path) == 0 else False
+		self.next_status = status_after_finish if finished else self.status 
 		self.status = Status.CHASING_GOAL
-		self.next_status = next_status
-		self.goal = Pose2D(next_pose[0], next_pose[1], None)
-		self.velocity = Twist()
+		self.goal = Pose2D(next_pose[0], next_pose[1], goal_orientation if finished else None)
+		self.goal_distance_tollerance = tollerance
+		self.velocity = Twist() # stops the robot
 		rospy.loginfo('Current goal is ({:.2f}, {:.2f})'.format(next_pose[0], next_pose[1]))
 
 
-	def chase_simple(self, position, orientation, goal, goal_orientation, tollerance = None):
+	def chase_straight(self, position, orientation, goal, goal_orientation):
 		done, vel = self.motion_controller.move(position, orientation,
 												goal, target_orientation=goal_orientation,
 												max_linear_speed=.15, max_orientation_speed=.75,
-												custom_distance_tollerance=tollerance)
+												custom_distance_tollerance=self.goal_distance_tollerance)
 		self.velocity.linear.x = vel.linear.x
 		self.velocity.angular.z = vel.angular.z
 
 		if done:
 			rospy.loginfo('Intermediate goal reached')
 			self.status = self.next_status
+			if self.status == Status.END:
+				rospy.loginfo('End reached')
+
 
 
 
 	def run(self, position, orientation, proximity, occupancy_grid):
 		""" Returns proper velocities accordingly to the current status. """
-
-		if self.target.pose.x != None and self.target.pose.y != None:
-			self.chase_planning(position, orientation, occupancy_grid, self.target.pose, None, Status.RETURNING, tollerance=0.30)
+		
+		if (self.target_found and self.next_status != Status.END and
+		   self.status != self.status_after_reaching_target and 
+		   self.next_status != self.status_after_reaching_target):
+			
+			self.status = Status.RETURNING
+			self.velocity = Twist()
+			self.planning_count = 0
+			# self.chase_planning(position, orientation, occupancy_grid, 
+			# 					self.target.pose, goal_orientation=None, 
+			# 					status_after_finish=self.status_after_reaching_target, tollerance=0.30)
 
 		elif self.status == Status.CHASING_GOAL:
-			self.chase_simple(position, orientation, self.goal, self.goal.theta)
+			self.chase_straight(position, orientation, self.goal, self.goal.theta)
 
 		elif self.status == Status.EXPLORING_RANDOM:
 			self.explore_random(position, orientation, occupancy_grid)
@@ -400,6 +425,11 @@ class ThymarController:
 			self.explore_covering(position, orientation, occupancy_grid)
 
 		elif self.status == Status.RETURNING:
-			self.chase_planning(position, orientation, occupancy_grid, Pose2D(0, 0), 0, Status.END)
+			self.chase_planning(position, orientation, occupancy_grid, 
+								Pose2D(0, 0), goal_orientation=0, 
+								status_after_finish=Status.END)
+
+		elif self.status == Status.END:
+			rospy.loginfo('Status END')
 
 		return self.velocity

@@ -159,12 +159,16 @@ class Thymar:
 
     def run(self):
 
-        print('Controller is running!')
+        print('Waiting for subscribers to be ready...')
+        while(not thymar.ready()):
+            pass
 
         controller = ThymarController(self.grid_resolution, Status.EXPLORING_COVERAGE)
+        print('Controller is running!')
 
         while not rospy.is_shutdown() and not controller.status == Status.END:
             if self.target_found:
+                controller.target_found = True
                 controller.target = self.target
 
             vel = controller.run(self.position, self.orientation, self.proximity, self.occupancy_grid)
@@ -192,11 +196,6 @@ class Thymar:
 if __name__ == '__main__':
     try:
         thymar = Thymar()
-
-        print('Waiting for subscribers to be ready...')
-        while(not thymar.ready()):
-            pass
-
         thymar.run()
 
     except rospy.ROSInterruptException as e:
