@@ -33,7 +33,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 	if(this->first){
 		this->world_point_cloud=new_point_cloud;
 
-		this->obstacles_point_cloud = this->directionalFilter(new_point_cloud, "z", -0.03, 5.0, terrain_cloud);
+		this->obstacles_point_cloud = this->directionalFilter(new_point_cloud, "z", 0.0, 5.0, terrain_cloud);
 		this->terrain_point_cloud = terrain_cloud;
 
 
@@ -43,7 +43,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 		
 		this->world_point_cloud+=rotated_new_point_cloud;
 
-		pcl::PointCloud<pcl::PointXYZ> filtered_new_point_cloud = this->directionalFilter(rotated_new_point_cloud, "z", -0.03, 5.0, terrain_cloud);
+		pcl::PointCloud<pcl::PointXYZ> filtered_new_point_cloud = this->directionalFilter(rotated_new_point_cloud, "z", 0.0, 5.0, terrain_cloud);
 		this->obstacles_point_cloud+=filtered_new_point_cloud;
 		this->terrain_point_cloud+=terrain_cloud;
 		
@@ -74,8 +74,26 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 
     	int xi = (int) std::round(x/grid_resolution);
     	int yi = (int) std::round(y/grid_resolution);
+    	xi += (this->grid_width/2);
+    	yi += (this->grid_height/2);
+		int index = (yi)*this->grid_width+xi;
 
-    	this->occupancy_grid[(yi+(this->grid_height/2))*this->grid_width+xi+(this->grid_width/2)] = 100;
+		if(this->occupancy_grid[index] <= 0){
+			this->occupancy_grid[index] = 100;
+			/*
+			// set to obstacles all the neighboring cells to account for noise
+			if( (xi >=1) && (xi < this->grid_width-1) && (yi >=1) && (yi < this->grid_height-1)){
+				this->occupancy_grid[(yi-1)*this->grid_width+(xi)] = 100;
+				this->occupancy_grid[(yi-1)*this->grid_width+(xi-1)] = 100;
+				this->occupancy_grid[(yi-1)*this->grid_width+(xi+1)] = 100;
+				this->occupancy_grid[(yi+1)*this->grid_width+(xi)] = 100;
+				this->occupancy_grid[(yi+1)*this->grid_width+(xi-1)] = 100;
+				this->occupancy_grid[(yi+1)*this->grid_width+(xi+1)] = 100;
+				this->occupancy_grid[(yi)*this->grid_width+(xi-1)] = 100;
+				this->occupancy_grid[(yi)*this->grid_width+(xi+1)] = 100;
+			}
+			*/
+		} 
     }
 
     
@@ -85,11 +103,43 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 
     	int xi = (int) std::round(x/grid_resolution);
     	int yi = (int) std::round(y/grid_resolution);
+    	xi += (this->grid_width/2);
+    	yi += (this->grid_height/2);
+		int index = (yi)*this->grid_width+xi;
 
-    	int index = (yi+(this->grid_height/2))*this->grid_width+xi+(this->grid_width/2);
     	// Do not overwrite obstacles grids!
-    	if(this->occupancy_grid[index] <= 0){
+    	if(this->occupancy_grid[index] < 0){
     		this->occupancy_grid[index] = 0;
+
+    		// set to traversable all the neighboring cells to account for noise
+    		for(int step=1;step <=0;step++){
+				if( (xi >=step) && (xi < this->grid_width-step) && (yi >=step) && (yi < this->grid_height-step)){
+					if(this->occupancy_grid[(yi-step)*this->grid_width+(xi)] == -1)
+						this->occupancy_grid[(yi-step)*this->grid_width+(xi)] = 0;
+
+					if(this->occupancy_grid[(yi-step)*this->grid_width+(xi-step)] == -1)
+						this->occupancy_grid[(yi-step)*this->grid_width+(xi-step)] = 0;
+
+					if(this->occupancy_grid[(yi-step)*this->grid_width+(xi+step)] == -1)
+						this->occupancy_grid[(yi-step)*this->grid_width+(xi+step)] = 0;
+
+					if(this->occupancy_grid[(yi+step)*this->grid_width+(xi)] == -1)
+						this->occupancy_grid[(yi+step)*this->grid_width+(xi)] = 0;
+
+					if(this->occupancy_grid[(yi+step)*this->grid_width+(xi-step)] == -1)
+						this->occupancy_grid[(yi+step)*this->grid_width+(xi-step)] = 0;
+
+					if(this->occupancy_grid[(yi+step)*this->grid_width+(xi+step)] == -1)
+						this->occupancy_grid[(yi+step)*this->grid_width+(xi+step)] = 0;
+
+					if(this->occupancy_grid[(yi)*this->grid_width+(xi-step)] == -1)
+						this->occupancy_grid[(yi)*this->grid_width+(xi-step)] = 0;
+
+					if(this->occupancy_grid[(yi)*this->grid_width+(xi+step)] == -1)
+						this->occupancy_grid[(yi)*this->grid_width+(xi+step)] = 0;
+				}
+			}
+
     	}
     	
     }

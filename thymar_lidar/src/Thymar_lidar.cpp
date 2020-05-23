@@ -84,6 +84,7 @@ void ThymarLidar::processLidarMeasurement(const pcl::PCLPointCloud2ConstPtr& clo
 
 		if(this->velocity.angular == 0){
 			pcl::fromPCLPointCloud2(*cloud_msg, this->cloud);
+			this->mapper->addPointCloud(this->cloud, this->pose2d);
 			this->new_point_cloud = true;
 		}
 		
@@ -126,7 +127,7 @@ void ThymarLidar::run(){
 		if(this->new_point_cloud){
 			this->new_point_cloud=false;
 
-			this->mapper->addPointCloud(this->cloud, this->pose2d);
+			//this->mapper->addPointCloud(this->cloud, this->pose2d);
 			
 			this->grid.data = this->mapper->getOccupancyGrid();
 			this->grid_publisher.publish(this->grid);
