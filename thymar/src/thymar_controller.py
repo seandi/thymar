@@ -373,7 +373,7 @@ class ThymarController:
 	def chase_simple(self, position, orientation, goal, goal_orientation, tollerance = None):
 		done, vel = self.motion_controller.move(position, orientation,
 												goal, target_orientation=goal_orientation,
-												max_linear_speed=.15, max_orientation_speed=.75,
+												max_linear_speed=.15, max_orientation_speed=.5,
 												custom_distance_tollerance=tollerance)
 		self.velocity.linear.x = vel.linear.x
 		self.velocity.angular.z = vel.angular.z
