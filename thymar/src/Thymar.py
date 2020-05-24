@@ -163,8 +163,13 @@ class Thymar:
         while(not thymar.ready()):
             pass
 
-        controller = ThymarController(self.grid_resolution, Status.EXPLORING_COVERAGE)
-        print('Controller is running!')
+        controller = ThymarController(self.grid_resolution,
+                        initital_status=Status.EXPLORING_SMART,
+                        status_after_founding_target=Status.CHASING_TARGET,
+                        status_after_reaching_target=Status.EXPLORING_COVERAGE,
+                        status_after_mapcoverage=Status.RETURNING)
+
+        print('Controller is running! \n')
 
         while not rospy.is_shutdown() and not controller.status == Status.END:
             if self.target_found:
@@ -176,6 +181,8 @@ class Thymar:
             self.rate.sleep()
 
             self.publish_path_plan(controller.planning_path)
+
+        print('Controller stopped!')
 
         
         # self.controller = ExplorerController()

@@ -10,10 +10,12 @@ from geometry_msgs.msg import Point
 
 class Status(Enum):
     EXPLORING_RANDOM = 1
-    EXPLORING_COVERAGE = 2
-    CHASING_GOAL = 3
-    RETURNING = 4
-    END = 5
+    EXPLORING_SMART = 2
+    EXPLORING_COVERAGE = 3
+    CHASING_GOAL = 5
+    CHASING_TARGET = 6
+    RETURNING = 10
+    END = 11
 
 
 class Pose2D:

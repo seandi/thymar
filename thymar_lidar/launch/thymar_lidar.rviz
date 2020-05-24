@@ -163,83 +163,19 @@ Visualization Manager:
       Unreliable: false
       Value: false
     - Class: rviz/TF
-      Enabled: true
+      Enabled: false
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        map:
-          Value: false
-        thymar/base_link:
-          Value: true
-        thymar/ground_left_link:
-          Value: false
-        thymar/ground_right_link:
-          Value: false
-        thymar/laser_link:
-          Value: false
-        thymar/left_wheel_link:
-          Value: false
-        thymar/odom:
-          Value: true
-        thymar/proximity_center_left_link:
-          Value: false
-        thymar/proximity_center_link:
-          Value: false
-        thymar/proximity_center_right_link:
-          Value: false
-        thymar/proximity_left_link:
-          Value: false
-        thymar/proximity_rear_left_link:
-          Value: false
-        thymar/proximity_rear_right_link:
-          Value: false
-        thymar/proximity_right_link:
-          Value: false
-        thymar/right_wheel_link:
-          Value: false
-        thymar/velodyne:
-          Value: false
-        thymar/velodyne_base_link:
-          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        thymar/odom:
-          map:
-            {}
-          thymar/base_link:
-            thymar/ground_left_link:
-              {}
-            thymar/ground_right_link:
-              {}
-            thymar/laser_link:
-              {}
-            thymar/left_wheel_link:
-              {}
-            thymar/proximity_center_left_link:
-              {}
-            thymar/proximity_center_link:
-              {}
-            thymar/proximity_center_right_link:
-              {}
-            thymar/proximity_left_link:
-              {}
-            thymar/proximity_rear_left_link:
-              {}
-            thymar/proximity_rear_right_link:
-              {}
-            thymar/proximity_right_link:
-              {}
-            thymar/right_wheel_link:
-              {}
-            thymar/velodyne_base_link:
-              thymar/velodyne:
-                {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -312,7 +248,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 0
@@ -329,7 +265,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 0.699999988079071
       Class: rviz/Map
       Color Scheme: map
@@ -345,7 +281,7 @@ Visualization Manager:
       Marker Topic: /thymar/target_marker
       Name: Target Marker
       Namespaces:
-        {}
+        basic_shapes: true
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -366,7 +302,7 @@ Visualization Manager:
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
-      Color: 32; 74; 135
+      Color: 84; 158; 10
       Enabled: true
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
@@ -416,25 +352,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 9.378334999084473
+      Distance: 6.237146854400635
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: 0.23859351873397827
+        Y: -1.528612732887268
+        Z: 0.9546566009521484
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7247964143753052
+      Pitch: 0.8997961282730103
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.608576774597168
+      Yaw: 3.8935792446136475
     Saved: ~
 Window Geometry:
   Displays:
