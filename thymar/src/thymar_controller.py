@@ -34,7 +34,7 @@ class ThymarController:
 				status_after_mapcoverage = Status.RETURNING,
 				robot_visibility = 1.1, robot_width = 0.2):
 
-		self.motion_controller = mv.ToTargetPController(linear_speed=0.15, orientation_speed = 2.5)
+		self.motion_controller = mv.ToTargetPController(linear_speed=0.13, orientation_speed = 2.5)
 		
 		self.velocity = Twist()
 		self.grid_resolution = grid_resolution
@@ -409,7 +409,7 @@ class ThymarController:
 	def chase_straight(self, position, orientation, goal, goal_orientation):
 		done, vel = self.motion_controller.move(position, orientation,
 												goal, target_orientation=goal_orientation,
-												max_linear_speed=.15, max_orientation_speed=.5,
+												max_linear_speed=.13, max_orientation_speed=.5,
 												custom_distance_tollerance=self.goal_distance_tollerance)
 		self.velocity.linear.x = vel.linear.x
 		self.velocity.angular.z = vel.angular.z

@@ -14,7 +14,7 @@
   <arg name="proximity_resolution" default="0.005"/>
   <arg name="proximity_fov" default="0.3"/>
 
-  <arg name="publish_ground_truth" default="true"/>
+  <arg name="publish_ground_truth" default="false"/>
   <arg name="ground_truth_frame_id" default="/world"/>
   <arg name="ground_truth_frame_rate" default="30.0"/>
 

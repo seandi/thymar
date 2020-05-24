@@ -80,7 +80,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 
 		if(this->occupancy_grid[index] <= 0){
 			this->occupancy_grid[index] = 100;
-			/*
+			 
 			// set to obstacles all the neighboring cells to account for noise
 			if( (xi >=1) && (xi < this->grid_width-1) && (yi >=1) && (yi < this->grid_height-1)){
 				this->occupancy_grid[(yi-1)*this->grid_width+(xi)] = 100;
@@ -92,7 +92,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 				this->occupancy_grid[(yi)*this->grid_width+(xi-1)] = 100;
 				this->occupancy_grid[(yi)*this->grid_width+(xi+1)] = 100;
 			}
-			*/
+			
 		} 
     }
 
