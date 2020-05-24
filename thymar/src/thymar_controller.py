@@ -363,7 +363,6 @@ class ThymarController:
 	def chase_planning(self, position, orientation, grid, goal, goal_orientation, 
 						status_after_finish, goal_distance_tollerance = None, 
 						recomputation = 6, skip_poses = 4):
-		
 		# path planning is only recomputed every `recomputation` timesteps
 		if len(self.planning_path) == 0 or (recomputation > 0 and self.planning_count % recomputation == 0): 
 			rospy.loginfo('Recomputing path for chasing ({:.2f}, {:.2f}) ...'.format(goal.x, goal.y))
@@ -383,7 +382,7 @@ class ThymarController:
 			gx = self.planning_path[-1][0]
 			gy = self.planning_path[-1][1]
 
-			rospy.loginfo('Computed path from from ({:.2f}, {:.2f}) to ({:.2f}, {:.2f}) of total lenght = {}'
+			rospy.loginfo('Computed path from ({:.2f}, {:.2f}) to ({:.2f}, {:.2f}) of total lenght = {}'
 							.format(sx, sy, gx, gy, len(self.planning_path)))
 
 		# for kinematics reasons, skips some of the planned poses and retrieve the next one to be reached
@@ -407,10 +406,22 @@ class ThymarController:
 
 
 	def chase_straight(self, position, orientation, goal, goal_orientation):
+		if self.target_found and self.target_chasing and not self.target_caught:
+			if np.sqrt((self.target.pose.x - position.x)**2 + (self.target.pose.y - position.y)**2) < self.target.radius * 3 + self.robot_width:
+				rospy.loginfo('TARGET REACHED!')
+				self.target_chasing = False
+				self.target_caught = True
+				self.velocity = Twist()
+				self.status = self.status_after_reaching_target
+
+				return
+
+
 		done, vel = self.motion_controller.move(position, orientation,
 												goal, target_orientation=goal_orientation,
 												max_linear_speed=.13, max_orientation_speed=.5,
 												custom_distance_tollerance=self.goal_distance_tollerance)
+
 		self.velocity.linear.x = vel.linear.x
 		self.velocity.angular.z = vel.angular.z
 
@@ -456,6 +467,7 @@ class ThymarController:
 			self.chase_straight(position, orientation, self.goal, self.goal.theta)
 
 		elif self.status == Status.CHASING_TARGET:
+			self.goal_distance_tollerance = self.target.radius * 6 + self.robot_width
 			self.chase_planning(position, orientation, occupancy_grid, 
 								self.target.pose, goal_orientation = None, 
 								status_after_finish = self.status_after_reaching_target, 
