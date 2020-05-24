@@ -14,7 +14,7 @@
   <arg name="proximity_resolution" default="0.005"/>
   <arg name="proximity_fov" default="0.3"/>
 
-  <arg name="publish_ground_truth" default="false"/>
+  <arg name="publish_ground_truth" default="true"/>
   <arg name="ground_truth_frame_id" default="/world"/>
   <arg name="ground_truth_frame_rate" default="30.0"/>
 
@@ -24,7 +24,7 @@
   <!-- Spawn the Thymar robot -->
   <group ns="$(eval arg('name') or '/')">
 	  <param name="tf_prefix" value="$(arg name)"/>
-	  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find thymar_description)/urdf/thymar.urdf.xacro' gpu:=$(arg gpu) name:=$(arg tf_name)" />
+	  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find thymar_description)/urdf/thymar.urdf.xacro' gpu:=$(arg gpu) name:=$(arg tf_name) 			publish_ground_truth:=$(arg publish_ground_truth)" />
           <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
 	    <param name="publish_frequency" type="double" value="30.0" />
 	  </node>

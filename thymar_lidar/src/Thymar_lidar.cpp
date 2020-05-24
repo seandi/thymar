@@ -58,7 +58,7 @@ ThymarLidar::ThymarLidar(int argc, char** argv, float hz, int grid_width, int gr
 		ros::NodeHandle nh_private("~");
     	nh_private.getParam("name", this->name);
     	 
-        this->odometry_subscriber = this->nh.subscribe<nav_msgs::Odometry>("/" +this->name +"/odom", 5, &ThymarLidar::parseOdometry, this);
+        this->odometry_subscriber = this->nh.subscribe<nav_msgs::Odometry>("/" +this->name +"/ground_truth/odom", 5, &ThymarLidar::parseOdometry, this);
         this->velocity_subscriber = this->nh.subscribe<geometry_msgs::Twist>("/" +this->name +"/cmd_vel", 5, &ThymarLidar::updateVelocities, this);
 		this->pointcloud_subscriber = this->nh.subscribe<pcl::PCLPointCloud2>("/" +this->name +"/velodyne_points", 5, &ThymarLidar::processLidarMeasurement, this);
 

@@ -31,7 +31,7 @@ class Thymar:
         print("Node for " + self.name + " initialized")
 
         self.velocity_publisher = rospy.Publisher('/' + self.name + '/cmd_vel', Twist, queue_size=10)
-        self.odometry_subscriber = rospy.Subscriber('/' + self.name + '/odom', Odometry, self.update_pose)
+        self.odometry_subscriber = rospy.Subscriber('/' + self.name + '/ground_truth/odom', Odometry, self.update_pose)
 
         rospy.on_shutdown(self.on_exit) # tell ros what to do when CTRL+C is pressed
 
