@@ -467,7 +467,7 @@ class ThymarController:
 			self.chase_straight(position, orientation, self.goal, self.goal.theta)
 
 		elif self.status == Status.CHASING_TARGET:
-			self.goal_distance_tollerance = self.target.radius * 6 + self.robot_width
+			# self.goal_distance_tollerance = self.target.radius * 6 + self.robot_width
 			self.chase_planning(position, orientation, occupancy_grid, 
 								self.target.pose, goal_orientation = None, 
 								status_after_finish = self.status_after_reaching_target, 
