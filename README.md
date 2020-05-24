@@ -41,13 +41,18 @@ The repo contains the ROS packages for the Thymar robot. Inside the project fold
 The Gazebo simulation of the Thymar robot can be launched as follows (with or without the GUI):  
 `roslaunch thymar_description thymar_gazebo_bringup.launch name:=thymar gui:=false world:=indoor_1`  
 
-Then launch the node processing the LIDAR Point Cloud, which will automatically also starts RViz for visualizing the result:  
-`roslaunch thymar_lidar lidar_processor.launch name:=thymar`  
-
-Finally, launch the main script that actually controls the robot movements:  
+Launch the main script that actually controls the robot movements:  
 `rosrun thymar Thymar.py _name:=thymar`
 
-NOTE: at the moment, there is a bug for which if the target is immediately visible when the lidar node is started, the Thymar.py script may never receive its position.
+Finally, launch the node processing the LIDAR Point Cloud, which will automatically also starts RViz for visualizing the result:  
+`roslaunch thymar_lidar lidar_processor.launch name:=thymar`  
+
+### Lidar configurations
+Two configurations for the lidar have been found to provide good performance
+1. Faster terrain coverage: set `hz="0.33" lasers="80"` in `~/catkin_ws/src/thymar/thymar_description/urf/`
+2. Faster pointcloud update: set `hz="0.50" lasers="64"` in `~/catkin_ws/src/thymar/thymar_description/urf/`
+
+
 
 
 
