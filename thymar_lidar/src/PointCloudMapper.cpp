@@ -4,6 +4,7 @@ PointCloudMapper::PointCloudMapper(int grid_width, int grid_height, float grid_r
 	this->grid_width = grid_width;
 	this->grid_height = grid_height;
 	this->grid_resolution = grid_resolution;
+	
 
 	this->occupancy_grid.resize(grid_width*grid_height);
 	std::fill(this->occupancy_grid.begin(),this->occupancy_grid.end(),-1);
@@ -96,7 +97,7 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
 		} 
     }
 
-    
+    int max_steps = this->conservative_postprocessing ? 0 : 1;
     for(int n=0; n<this->terrain_point_cloud.points.size(); n++){
     	x = this->terrain_point_cloud.points[n].x;
     	y = this->terrain_point_cloud.points[n].y;
@@ -143,6 +144,54 @@ void PointCloudMapper::addPointCloud(pcl::PointCloud<pcl::PointXYZ> new_point_cl
     	}
     	
     }
+
+
+
+    for(int xi=1; xi<this->grid_width-1; xi++){
+    	for(int yi=1; yi<this->grid_height-1; yi++){
+    		if(this->occupancy_grid[(yi)*this->grid_width+(xi)]>=0)
+    			continue;
+    		//std::cout << xi <<","<<yi<<" :  " << (yi)*this->grid_width+(xi) << std::endl;
+    		
+    		
+    		for(int step=1;step <=3;step++){
+    			int terrain_tiles = 0;
+				if( (xi >=step) && (xi < this->grid_width-step) && (yi >=step) && (yi < this->grid_height-step)){
+					if(this->occupancy_grid[(yi-step)*this->grid_width+(xi)] == 0)
+						terrain_tiles +=1;
+
+					if(this->occupancy_grid[(yi-step)*this->grid_width+(xi-step)] == 0)
+						terrain_tiles +=1;
+
+					if(this->occupancy_grid[(yi-step)*this->grid_width+(xi+step)] == 0)
+						terrain_tiles +=1;
+
+					if(this->occupancy_grid[(yi+step)*this->grid_width+(xi)] == 0)
+						terrain_tiles +=1;
+
+					if(this->occupancy_grid[(yi+step)*this->grid_width+(xi-step)] == 0)
+						terrain_tiles +=1;
+
+					if(this->occupancy_grid[(yi+step)*this->grid_width+(xi+step)] == 0)
+						terrain_tiles +=1;
+
+					if(this->occupancy_grid[(yi)*this->grid_width+(xi-step)] == 0)
+						terrain_tiles +=1;
+
+					if(this->occupancy_grid[(yi)*this->grid_width+(xi+step)] == 0)
+						terrain_tiles +=1;
+				}
+
+				if(terrain_tiles>=(4*step+1)){
+					this->occupancy_grid[(yi)*this->grid_width+(xi)] = 0;
+			}
+			}
+
+			
+			
+		}
+    }
+
 }
 
 pcl::PointCloud<pcl::PointXYZ> PointCloudMapper::downSample(pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud){

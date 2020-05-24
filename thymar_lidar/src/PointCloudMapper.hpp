@@ -40,6 +40,7 @@ private:
 	int grid_height;
 	float grid_resolution;
 	bool first = true;
+	bool conservative_postprocessing = true;
 
 	pcl::PointCloud<pcl::PointXYZ> downSample(pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud);
 	pcl::PointCloud<pcl::PointXYZ> transform(pcl::PointCloud<pcl::PointXYZ> source_cloud, float x, float y, float z, float theta);
