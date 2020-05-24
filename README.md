@@ -48,9 +48,9 @@ Finally, launch the node processing the LIDAR Point Cloud, which will automatica
 `roslaunch thymar_lidar lidar_processor.launch name:=thymar`  
 
 ### Lidar configurations
-Two configuration for the lidar have been found to provide good performance
-1. Faster terrain coverage: `hz="0.33" lasers="80"`
-2. Faster pointcloud update: `hz="0.50" lasers="64"`
+Two configurations for the lidar have been found to provide good performance
+1. Faster terrain coverage: set `hz="0.33" lasers="80"` in `~/catkin_ws/src/thymar/thymar_description/urf/'
+2. Faster pointcloud update: set `hz="0.50" lasers="64"` in `~/catkin_ws/src/thymar/thymar_description/urf/'
 
 
 
