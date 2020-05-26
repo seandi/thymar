@@ -32,6 +32,7 @@ class ThymarController:
 				status_after_founding_target = Status.CHASING_TARGET, 
 				status_after_reaching_target = Status.EXPLORING_COVERAGE,
 				status_after_mapcoverage = Status.RETURNING,
+				allow_unknown_traversing = False,
 				robot_visibility = 1.1, robot_width = 0.2):
 
 		self.motion_controller = mv.ToTargetPController(linear_speed=0.13, orientation_speed = 2.5)
@@ -45,6 +46,7 @@ class ThymarController:
 		self.target_found = False
 		self.target_chasing = False
 		self.target_caught = False
+		self.target_distance_tollerance = None
 
 		self.status = initital_status # current status
 		self.next_status = None # keeps track of the main task while performing sub-tasks (e.g., tracking path planning while goal chasing)
@@ -58,7 +60,7 @@ class ThymarController:
 		self.stucked_count = 0 # used to count how many times the robot get stucked
 		self.planning_count = 0 # used to count how many timesteps are elapsed since the last path planning
 		self.planning_path = [] # tracks path to follow
-
+		self.allow_unknown_traversing = allow_unknown_traversing
 
 
 	# ------------------- COMMON UTILS
@@ -146,7 +148,10 @@ class ThymarController:
 		# instead of decreasing it (such as it would happen in a normal matrix).
 
 		# Due to the robot width, cells next to the obstacles must be ignored for robot traversing
-		collision = np.ceil(self.robot_width/self.grid_resolution/2).astype(int)
+		collision = np.ceil(self.robot_width/self.grid_resolution*0.75).astype(int)
+
+		if grid[gpose[1], gpose[0]] == obstacle_identifier:
+			return False
 		
 		cells = set([gpose])
 		for _ in range(collision): # explore all adjacent cells for a maximum of `collision` layers
@@ -198,10 +203,11 @@ class ThymarController:
 		return path[::-1]
 
 
-	def path_planning(self, grid, start_odom, goal_odom, goal_identifier = None):
+	def path_planning(self, grid, allow_unknown, start_odom, goal_odom, goal_identifier = None, obstacle_identifier = 100, unknown_identifier = -1):
 		""" 
 			Applies A* or Dijkstra depending on the fact that `goal_odom` is specified or not. 
 			If not, then a `goal_identifier` (as integer) is needed for identifying what to look for in the grid. 
+			Parameter `allow_unknown` set to True enables traversing unknown areas.
 		"""
 
 		start_grid = self.odom_to_grid(start_odom)
@@ -209,13 +215,12 @@ class ThymarController:
 		
 		if goal_grid == None and goal_identifier == None: 
 			raise Exception('You must have either a goal pose or goal_identifier.')
-
-		obstacle_identifier = 100
-		grid_with_target = np.copy(grid)
-		if self.target_found and self.target_chasing: # do not consider the target as an obstacle
-			tx, ty = self.odom_to_grid((self.target.pose.x, self.target.pose.y))
-			w = np.ceil(self.target.radius*1.5/self.grid_resolution).astype(int)
-			grid_with_target[ty-w:ty+w, tx-w:tx+w] = obstacle_identifier - 5 # different from `obstacle_identifier`
+		
+		# grid_with_target = np.copy(grid)
+		# if self.target_found and self.target_chasing: # do not consider the target as an obstacle
+		# 	tx, ty = self.odom_to_grid((self.target.pose.x, self.target.pose.y))
+		# 	w = np.ceil(self.target.radius*1.5/self.grid_resolution).astype(int)
+		# 	grid_with_target[ty-w:ty+w, tx-w:tx+w] = obstacle_identifier - 5 # different from `obstacle_identifier`
 
 		open_set = dict() # nodes to explore
 		closed_set = dict() # already explored nodes
@@ -238,6 +243,9 @@ class ThymarController:
 			del open_set[chosen_idx]
 			closed_set[chosen_idx] = current_node
 
+			if not allow_unknown and grid[current_node.pose[1], current_node.pose[0]] == unknown_identifier:
+				continue # if traversing unknown areas is not allowed, then do not compute neighbourhood of unknown nodes
+
 			neighbourhood = self.get_neighbourhood(grid, current_node.pose) # list of neighbours poses (tuple)
 			
 			for _, neighbour in enumerate(neighbourhood):
@@ -245,7 +253,8 @@ class ThymarController:
 				if neighbour in closed_set:
 					continue # already explored
 
-				if not np.allclose(neighbour, start_node.pose, atol=2) and not self.is_valid_neighbour(grid_with_target, neighbour, obstacle_identifier):
+				# cells near to the starting pose are not excluded from being a neighbour
+				if not np.allclose(neighbour, start_node.pose, atol=2) and not self.is_valid_neighbour(grid, neighbour, obstacle_identifier):
 					continue # obstacle or out of the map
 
 				g_score = current_node.g_score + mv.euclidean_distance_tuple(current_node.pose, neighbour)
@@ -318,21 +327,23 @@ class ThymarController:
 
 
 	def explore_covering(self, position, orientation, occupancy_grid, 
-						recomputation = 4, skip_poses = 3, nopath_status = Status.END):
-		""" Explores the environment while always managing to reach the nearest undiscovered position in the map. """
+						recomputation = 10, skip_poses = 3, nopath_status = Status.END):
+		""" Explores the environment while always managing to reach the nearest unknown position in the map. """
 
-		# path planning is only recomputed every `recomputation` timesteps
-		if len(self.planning_path) == 0 or (recomputation > 0 and self.planning_count % recomputation == 0): 
+		# path planning is only recomputed every `recomputation` timesteps or the path is too short
+		min_path_length = np.ceil(self.robot_width / self.grid_resolution/2).astype(int)
+		if len(self.planning_path) < min_path_length or self.planning_count % recomputation == 0: 
 			rospy.loginfo('Recomputing path for reaching unknown areas...')
 			sx = position.x	
 			sy = position.y
-			self.planning_path = self.path_planning(occupancy_grid, (sx, sy), None, -1)
+			self.planning_path = self.path_planning(occupancy_grid, self.allow_unknown_traversing, (sx, sy), 
+													goal_odom = None, goal_identifier = -1)
 			
 			if self.planning_path == None or len(self.planning_path) == 0:
-				rospy.loginfo('Cannot find a feasible path for unknown areas!')
-				rospy.loginfo('Status changed to ' + str(nopath_status))
-				self.status = nopath_status
 				self.velocity = Twist() # stops the robot
+				self.status = nopath_status
+				rospy.loginfo('Cannot find a feasible path for unknown areas!')
+				rospy.loginfo('Status changed to ' + str(self.status))
 				return
 
 			gx = self.planning_path[-1][0]
@@ -349,34 +360,53 @@ class ThymarController:
 				break
 
 		next_pose = self.planning_path.pop(0)
-		self.planning_count += 1
-
-		# set goal for reaching the pose while setting next status the same as now
-		self.next_status = self.status
-		self.status = Status.CHASING_GOAL
-		self.goal = Pose2D(next_pose[0], next_pose[1], None)
-		self.goal_distance_tollerance = None
+		next_area = occupancy_grid[self.odom_to_grid(next_pose)[::-1]]
 		self.velocity = Twist() # stops the robot
-		rospy.loginfo('Current goal is ({:.2f}, {:.2f})'.format(next_pose[0], next_pose[1]))
+
+		if next_area == -1 or next_area == 100:
+			# it is possible that new explored areas are unknown or obstacles, so better not to reach them
+			self.planning_count = 0
+			rospy.loginfo('Early path recomputation because unknown area or obstacle has been seen on the path')
+		else:
+			self.planning_count += 1
+			# set goal for reaching the pose while setting next status the same as now
+			self.goal = Pose2D(next_pose[0], next_pose[1], None)
+			self.goal_distance_tollerance = None
+			self.next_status = self.status
+			self.status = Status.CHASING_GOAL
+			rospy.loginfo('Current goal is ({:.2f}, {:.2f})'.format(next_pose[0], next_pose[1]))
 
 	
-	def chase_planning(self, position, orientation, grid, goal, goal_orientation, 
-						status_after_finish, goal_distance_tollerance = None, 
-						recomputation = 10, skip_poses = 4):
-		# path planning is only recomputed every `recomputation` timesteps
-		if len(self.planning_path) == 0 or (recomputation > 0 and self.planning_count % recomputation == 0): 
+	def chase_planning(self, position, orientation, occupancy_grid, 
+						goal, goal_orientation, status_after_finish, 
+						recomputation = 6, skip_poses = 3, 
+						obstacle_identifier = 100, unknown_identifier = -1):
+		""" 
+			Chase a goal pose by using path planning. 
+			Path is recomputed after a number `recomputation` of intermediate poses reached;
+			if it is <= 0, the path is never recomputed until the goal is reached. 
+		"""
+
+		grid_with_target = np.copy(occupancy_grid)
+		if self.target_found and self.target_chasing: # do not consider the target as an obstacle
+			tx, ty = self.odom_to_grid((self.target.pose.x, self.target.pose.y))
+			w = np.ceil(self.target_distance_tollerance/self.grid_resolution).astype(int) + 1
+			grid_with_target[ty-w:ty+w, tx-w:tx+w] = obstacle_identifier - 5 # different from `obstacle_identifier`
+
+
+		if len(self.planning_path) == 0 or self.planning_count % recomputation == 0: 
 			rospy.loginfo('Recomputing path for chasing ({:.2f}, {:.2f}) ...'.format(goal.x, goal.y))
 			sx = position.x	
 			sy = position.y
-			gx = goal.x
-			gy = goal.y
-			self.planning_path = self.path_planning(grid, (sx, sy), (gx, gy), None)
+			self.planning_path = self.path_planning(grid_with_target, self.allow_unknown_traversing, (sx, sy), 
+													(goal.x, goal.y), None,
+													obstacle_identifier, unknown_identifier)
 			
 			if len(self.planning_path) == 0:
-				rospy.loginfo('Cannot find a feasible path for chasing ({:.2f}, {:.2f}) ...'.format(goal.x, goal.y))
-				self.status = Status.END
-				rospy.loginfo('Status changed to ' + str(self.status))
 				self.velocity = Twist() # stops the robot
+				self.status = Status.END
+				rospy.loginfo('Cannot find a feasible path for chasing ({:.2f}, {:.2f}) ...'.format(goal.x, goal.y))
+				rospy.loginfo('Status changed to ' + str(self.status))
 				return
 
 			gx = self.planning_path[-1][0]
@@ -386,31 +416,36 @@ class ThymarController:
 							.format(sx, sy, gx, gy, len(self.planning_path)))
 
 		# for kinematics reasons, skips some of the planned poses and retrieve the next one to be reached
-		for _ in range(skip_poses + 1):
+		for _ in range(skip_poses):
 			if len(self.planning_path) > 1:
 				next_pose = self.planning_path.pop(0)
 			else:
 				break
 
 		next_pose = self.planning_path.pop(0)
-		self.planning_count += 1
-
-		# set goal for reaching the pose while setting next status as specified, if the final goal has been reached
+		next_area = grid_with_target[self.odom_to_grid(next_pose)[::-1]]
 		finished = True if len(self.planning_path) == 0 else False
-		self.next_status = status_after_finish if finished else self.status 
-		self.status = Status.CHASING_GOAL
-		self.goal = Pose2D(next_pose[0], next_pose[1], goal_orientation if finished else None)
-		self.goal_distance_tollerance = goal_distance_tollerance if finished else None
 		self.velocity = Twist() # stops the robot
-		rospy.loginfo('Current goal is ({:.2f}, {:.2f})'.format(next_pose[0], next_pose[1]))
+
+		if next_area == unknown_identifier or next_area == obstacle_identifier:			
+			# it is possible that new explored areas are unknown or obstacles, so better not to reach them
+			self.planning_count = 0
+			rospy.loginfo('Early path recomputation because unknown area or obstacle has been seen on the path')
+		else:
+			self.planning_count += 1
+			# set goal for reaching the pose while setting next status as specified, if the final goal has been reached
+			self.goal = Pose2D(next_pose[0], next_pose[1], goal_orientation if finished else None)
+			self.next_status = status_after_finish if finished else self.status # after current goal has been reached, returns in the previous state
+			self.status = Status.CHASING_GOAL
+			rospy.loginfo('Current goal is ({:.2f}, {:.2f})'.format(next_pose[0], next_pose[1]))
+
 
 
 	def chase_straight(self, position, orientation, goal, goal_orientation):
 
 		done, vel = self.motion_controller.move(position, orientation,
 												goal, target_orientation=goal_orientation,
-												max_linear_speed=.13, max_orientation_speed=.5,
-												custom_distance_tollerance=self.goal_distance_tollerance)
+												max_linear_speed=.13, max_orientation_speed=.5)
 
 		self.velocity.linear.x = vel.linear.x
 		self.velocity.angular.z = vel.angular.z
@@ -419,12 +454,7 @@ class ThymarController:
 			rospy.loginfo('Intermediate goal reached')
 			self.status = self.next_status
 
-			if self.target_chasing and self.status == self.status_after_reaching_target:
-				rospy.loginfo('TARGET REACHED!')
-				self.target_chasing = False
-				self.target_caught = True
-
-			elif self.status == Status.END:
+			if self.status == Status.END:
 				rospy.loginfo('END REACHED!')
 
 
@@ -435,13 +465,24 @@ class ThymarController:
 	def run(self, position, orientation, proximity, occupancy_grid):
 		""" Returns proper velocities accordingly to the current status. """
 		
-		if (self.target_found and not self.target_chasing and not self.target_caught):
-			rospy.loginfo('Target identified!')
-			self.target_chasing = True
+		if self.target_found and not self.target_chasing and not self.target_caught:
+			rospy.loginfo('TARGET IDENTIFIED!')
 			self.velocity = Twist()
 			self.planning_count = 0
+			self.target_chasing = True
+			self.target_distance_tollerance = self.target.radius * 2 + self.robot_width
 			self.status = self.status_after_founding_target
 			self.next_status = None
+			rospy.loginfo('Status changed to ' + str(self.status))
+
+		elif self.target_found and self.target_chasing and mv.euclidean_distance(position, self.target.pose) < self.target_distance_tollerance:
+			rospy.loginfo('TARGET REACHED!')
+			self.velocity = Twist()
+			self.target_chasing = False
+			self.target_caught = True
+			self.status = self.status_after_reaching_target
+			self.next_status = None
+			rospy.loginfo('Status changed to ' + str(self.status))
 
 		elif self.status == Status.EXPLORING_RANDOM:
 			self.explore_random(position, orientation, occupancy_grid)
@@ -450,8 +491,7 @@ class ThymarController:
 			self.explore_covering(position, orientation, occupancy_grid)
 
 		elif self.status == Status.EXPLORING_COVERAGE:
-			self.explore_covering(position, orientation, occupancy_grid, 
-								recomputation = 10, skip_poses = 3,
+			self.explore_covering(position, orientation, occupancy_grid,
 								nopath_status = self.status_after_mapcoverage)
 
 		elif self.status == Status.CHASING_GOAL:
@@ -460,12 +500,13 @@ class ThymarController:
 		elif self.status == Status.CHASING_TARGET:
 			self.chase_planning(position, orientation, occupancy_grid, 
 								self.target.pose, goal_orientation = None, 
-								status_after_finish = self.status_after_reaching_target, 
-								goal_distance_tollerance = self.target.radius * 6 + self.robot_width)
+								recomputation = 2 if self.allow_unknown_traversing else 100,
+								status_after_finish = self.status_after_reaching_target)
 
 		elif self.status == Status.RETURNING:
 			self.chase_planning(position, orientation, occupancy_grid, 
 								Pose2D(0, 0), goal_orientation = 0, 
+								recomputation = 2 if self.allow_unknown_traversing else 100,
 								status_after_finish = Status.END)
 
 		elif self.status == Status.END:

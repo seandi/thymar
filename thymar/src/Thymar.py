@@ -6,12 +6,12 @@ from geometry_msgs.msg import Twist, Pose, Point, PoseStamped
 from nav_msgs.msg import Odometry, OccupancyGrid, Path
 from sensor_msgs.msg import Range
 from visualization_msgs.msg import Marker
+import time
 from math import pi
 import numpy as np
 from matplotlib import pyplot as plt
+
 from thymar_controller import ThymarController
-
-
 import movement_utils as mv
 from movement_utils import Pose2D, Target, Status
 from explorer_controller import ExplorerController
@@ -163,11 +163,14 @@ class Thymar:
         while(not thymar.ready()):
             pass
 
+        time.sleep(1)
+
         controller = ThymarController(self.grid_resolution,
-                        initital_status=Status.EXPLORING_SMART,
-                        status_after_founding_target=Status.CHASING_TARGET,
-                        status_after_reaching_target=Status.EXPLORING_COVERAGE,
-                        status_after_mapcoverage=Status.RETURNING)
+                        initital_status = Status.EXPLORING_SMART,
+                        status_after_founding_target = Status.CHASING_TARGET,
+                        status_after_reaching_target = Status.EXPLORING_COVERAGE,
+                        status_after_mapcoverage = Status.RETURNING,
+                        allow_unknown_traversing = False)
 
         print('Controller is running! \n')
 
