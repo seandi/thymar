@@ -462,7 +462,7 @@ class ThymarController:
 	# ------------------- STATES HANDLER
 
 
-	def run(self, position, orientation, proximity, occupancy_grid):
+	def run(self, position, orientation, occupancy_grid):
 		""" Returns proper velocities accordingly to the current status. """
 		
 		if self.target_found and not self.target_chasing and not self.target_caught:
