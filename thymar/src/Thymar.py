@@ -11,9 +11,9 @@ from math import pi
 import numpy as np
 from matplotlib import pyplot as plt
 
-from thymar_controller import ThymarController
-import movement_utils as mv
-from movement_utils import Pose2D, Target, Status
+from thymar_controller import ThymarController, Status
+import utils_movement as move_utils
+from utils_movement import Pose2D, Target
 
 
 
@@ -54,7 +54,7 @@ class Thymar:
         quaternion = data.pose.pose.orientation
         explicit_quat = [quaternion.x, quaternion.y, quaternion.z, quaternion.w]
         _, _, self.orientation = euler_from_quaternion(explicit_quat)
-        self.orientation = mv.to_positive_angle(self.orientation)
+        self.orientation = move_utils.to_positive_angle(self.orientation)
 
     def update_occupancy_grid(self, data):
         self.grid_width = data.info.width

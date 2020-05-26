@@ -1,4 +1,3 @@
-from enum import Enum
 import numpy as np
 from math import pow, atan2, sqrt, pi
 
@@ -6,16 +5,6 @@ import rospy
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Point
 
-
-
-class Status(Enum):
-    EXPLORING_RANDOM = 1
-    EXPLORING_SMART = 2
-    EXPLORING_COVERAGE = 3
-    CHASING_GOAL = 5
-    CHASING_TARGET = 6
-    RETURNING = 10
-    END = 11
 
 
 class Pose2D:

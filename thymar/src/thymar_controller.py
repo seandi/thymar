@@ -1,26 +1,24 @@
+from enum import Enum
 import numpy as np
 from matplotlib import pyplot as plt
 
 import rospy
 from geometry_msgs.msg import Twist, Pose, Point
 
-import movement_utils as mv
-from movement_utils import Pose2D, Target, Status
+import utils_occupancygrid as grid_utils
+import utils_movement as move_utils
+from utils_movement import Pose2D, Target
 
 
 
-class GraphNode:
-	def __init__(self, pose, g_score, prev_node_pose, goal_pose):
-		self.pose = pose
-		self.g_score = g_score # actual cost
-		self.h_score = 0 if goal_pose == None else mv.euclidean_distance_tuple(self.pose, goal_pose) # heuristic cost
-		self.prev_node_pose = prev_node_pose
-
-	def f_score(self):
-		return self.g_score + self.h_score # priority cost
-
-	def __str__(self):
-		return str(self.pose) + ", g:" + str(self.g_score) + ", f:" + "{:.3f}".format(self.f_score()) + ", prev:" + str(self.prev_node_pose)
+class Status(Enum):
+    EXPLORING_RANDOM = 1
+    EXPLORING_SMART = 2
+    EXPLORING_COVERAGE = 3
+    CHASING_GOAL = 5
+    CHASING_TARGET = 6
+    RETURNING = 10
+    END = 11
 
 
 
@@ -33,14 +31,17 @@ class ThymarController:
 				status_after_reaching_target = Status.EXPLORING_COVERAGE,
 				status_after_mapcoverage = Status.RETURNING,
 				allow_unknown_traversing = False,
-				robot_visibility = 1.1, robot_width = 0.2):
+				robot_visibility = 1.1, robot_width = 0.2,
+				obstacle_identifier = 100, unknown_identifier = -1):
 
-		self.motion_controller = mv.ToTargetPController(linear_speed=0.13, orientation_speed = 2.5)
+		self.motion_controller = move_utils.ToTargetPController(linear_speed=0.13, orientation_speed = 2.5)
 		
 		self.velocity = Twist()
 		self.grid_resolution = grid_resolution
 		self.robot_width = robot_width
 		self.robot_visibility = robot_visibility
+		self.obstacle_identifier = obstacle_identifier
+		self.unknown_identifier = unknown_identifier
 
 		self.target = Target() # target found in the map
 		self.target_found = False
@@ -61,212 +62,8 @@ class ThymarController:
 		self.planning_count = 0 # used to count how many timesteps are elapsed since the last path planning
 		self.planning_path = [] # tracks path to follow
 		self.allow_unknown_traversing = allow_unknown_traversing
+		self.obstacle_safe_distance = np.ceil(self.robot_width/self.grid_resolution*0.75).astype(int)
 
-
-	# ------------------- COMMON UTILS
-
-
-	def odom_to_grid(self, odom):
-		""" Transforms Odom coordinates to OccupancyGrid coordinates. """
-
-		x_grid = round(odom[0] / self.grid_resolution) + 200
-		y_grid = round(odom[1] / self.grid_resolution) + 200
-		return int(x_grid), int(y_grid)
-
-
-	def grid_to_odom(self, grid):
-		""" Transforms OccupancyGrid coordinates to Odom coordinates. """
-
-		x_odom = (grid[0] - 200) * self.grid_resolution
-		y_odom = (grid[1] - 200) * self.grid_resolution
-		return x_odom, y_odom
-	
-
-
-	def pose_ahead(self, x, y, theta, meters_ahead):
-		""" Computes a pose that is `meters_ahead` meters ahead wrt the current pose. """
-
-		ahead_x = meters_ahead * np.cos(theta) + x
-		ahead_y = meters_ahead * np.sin(theta) + y
-		return ahead_x, ahead_y
-
-
-
-	def has_facing_obstacle(self, grid, x, y, theta, robot_visibility = None):
-		""" Given the current pose, check if the robot is facing an obstacle. """
-
-		robot_visibility = min(robot_visibility, 2.5) or self.robot_visibility
-		step = self.grid_resolution
-
-		obstacle_facing = False
-		obstacle_distance = None
-		obstacle_odom = None
-
-		adjacent_cells = np.ceil(self.robot_width/step/2).astype(int)
-		theta_orthogonal = theta + np.pi/2
-
-		for i in range(int(robot_visibility//step)):
-
-			distance = step * i
-			ahead_odom = self.pose_ahead(x, y, theta, distance)
-			ahead_grid = self.odom_to_grid(ahead_odom)
-
-			if grid[ahead_grid[::-1]] == 100:
-				obstacle_facing = True
-			else:
-				ahead_grid_near = [] # used for checking cells that would be hit by robot width
-				for j in range(1, adjacent_cells + 1):
-					l = self.odom_to_grid(self.pose_ahead(ahead_odom[0], ahead_odom[1], theta_orthogonal, j *  self.grid_resolution))
-					r = self.odom_to_grid(self.pose_ahead(ahead_odom[0], ahead_odom[1], theta_orthogonal, j * -self.grid_resolution))
-					ahead_grid_near.append(l)
-					ahead_grid_near.append(r)
-			
-			ahead_grid_near = list(set(ahead_grid_near))
-			# print('grid:', ahead_grid, '\t adj:', ahead_grid_list, '\t odom:', ahead_odom)
-
-			for j in range(len(ahead_grid_near)):
-				if grid[ahead_grid_near[j][::-1]] == 100: 
-					obstacle_facing = True
-					break
-
-			if obstacle_facing:
-				obstacle_distance = distance
-				obstacle_odom = ahead_odom
-				break
-		
-		return obstacle_facing, obstacle_distance, obstacle_odom
-
-
-	# ------------------- PATH PLANNING UTILS
-
-
-	def is_valid_neighbour(self, grid, gpose, obstacle_identifier = 100):
-		# When reading this code, please remember that while pose is expressed as (X,Y),
-		# the matrix indexing for `grid` is instead to be done as (Y,X).
-		# Moreover, the Y is flipped in the map (see maps images), then for moving the
-		# robot UP we actually need to increment Y (row_index + 1)
-		# instead of decreasing it (such as it would happen in a normal matrix).
-
-		# Due to the robot width, cells next to the obstacles must be ignored for robot traversing
-		collision = np.ceil(self.robot_width/self.grid_resolution*0.75).astype(int)
-
-		if grid[gpose[1], gpose[0]] == obstacle_identifier:
-			return False
-		
-		cells = set([gpose])
-		for _ in range(collision): # explore all adjacent cells for a maximum of `collision` layers
-			tmp =  set([])
-			for _, tup in enumerate(cells):
-				x = tup[0]
-				y = tup[1]
-				tmp.add((x - 1, y)) # left
-				tmp.add((x + 1, y)) # right
-				tmp.add((x, y - 1)) # down
-				tmp.add((x, y + 1)) # up
-				tmp.add((x - 1, y - 1)) # diagonal left-down
-				tmp.add((x - 1, y + 1)) # diagonal left-up
-				tmp.add((x + 1, y - 1)) # diagonal right-down
-				tmp.add((x + 1, y + 1)) # diagonal right-up
-
-			for _, tup in enumerate(tmp): # checking cells for validity
-				try:
-					if grid[tup[1], tup[0]] == obstacle_identifier:
-						return False
-				except IndexError:
-					return False
-
-			cells = cells.union(tmp)
-
-		return True
-
-
-	def get_neighbourhood(self, grid, grid_pose):
-		x = grid_pose[0] # x=col
-		y = grid_pose[1] # y=row
-		neighbourhood = []
-		neighbourhood.append((x - 1, y)) # left
-		neighbourhood.append((x + 1, y)) # right
-		neighbourhood.append((x, y - 1)) # down
-		neighbourhood.append((x, y + 1)) # up
-		neighbourhood.append((x - 1, y - 1)) # diagonal left-down
-		neighbourhood.append((x - 1, y + 1)) # diagonal left-up
-		neighbourhood.append((x + 1, y - 1)) # diagonal right-down
-		neighbourhood.append((x + 1, y + 1)) # diagonal right-up
-		return neighbourhood
-
-
-	def get_complete_path(self, nodes_set, node):
-		path = [node.pose]
-		while node.prev_node_pose != None:
-			path.append(node.prev_node_pose)
-			node = nodes_set[node.prev_node_pose]
-		return path[::-1]
-
-
-	def path_planning(self, grid, allow_unknown, start_odom, goal_odom, goal_identifier = None, obstacle_identifier = 100, unknown_identifier = -1):
-		""" 
-			Applies A* or Dijkstra depending on the fact that `goal_odom` is specified or not. 
-			If not, then a `goal_identifier` (as integer) is needed for identifying what to look for in the grid. 
-			Parameter `allow_unknown` set to True enables traversing unknown areas.
-		"""
-
-		start_grid = self.odom_to_grid(start_odom)
-		goal_grid = None if goal_odom == None else self.odom_to_grid(goal_odom)
-		
-		if goal_grid == None and goal_identifier == None: 
-			raise Exception('You must have either a goal pose or goal_identifier.')
-		
-		# grid_with_target = np.copy(grid)
-		# if self.target_found and self.target_chasing: # do not consider the target as an obstacle
-		# 	tx, ty = self.odom_to_grid((self.target.pose.x, self.target.pose.y))
-		# 	w = np.ceil(self.target.radius*1.5/self.grid_resolution).astype(int)
-		# 	grid_with_target[ty-w:ty+w, tx-w:tx+w] = obstacle_identifier - 5 # different from `obstacle_identifier`
-
-		open_set = dict() # nodes to explore
-		closed_set = dict() # already explored nodes
-		
-		start_node = GraphNode(start_grid, 0, None, goal_grid)
-		open_set[start_node.pose] = start_node
-
-		while len(open_set) > 0:
-
-			# get the node with minimum f_score
-			chosen_idx = min(open_set, key = lambda dict_idx: open_set[dict_idx].f_score()) 
-			current_node = open_set[chosen_idx]
-			
-			success = True if goal_grid == None or current_node.pose == goal_grid else False
-			success = True if success and (goal_identifier == None or grid[current_node.pose[::-1]] == goal_identifier) else False
-
-			if success: 
-				return [self.grid_to_odom(p) for p in self.get_complete_path(closed_set, current_node)] # success: goal reached
-
-			del open_set[chosen_idx]
-			closed_set[chosen_idx] = current_node
-
-			if not allow_unknown and grid[current_node.pose[1], current_node.pose[0]] == unknown_identifier:
-				continue # if traversing unknown areas is not allowed, then do not compute neighbourhood of unknown nodes
-
-			neighbourhood = self.get_neighbourhood(grid, current_node.pose) # list of neighbours poses (tuple)
-			
-			for _, neighbour in enumerate(neighbourhood):
-			
-				if neighbour in closed_set:
-					continue # already explored
-
-				# cells near to the starting pose are not excluded from being a neighbour
-				if not np.allclose(neighbour, start_node.pose, atol=2) and not self.is_valid_neighbour(grid, neighbour, obstacle_identifier):
-					continue # obstacle or out of the map
-
-				g_score = current_node.g_score + mv.euclidean_distance_tuple(current_node.pose, neighbour)
-
-				if neighbour not in open_set: # new node
-					open_set[neighbour] = GraphNode(neighbour, g_score, current_node.pose, goal_grid)
-				
-				elif open_set[neighbour].g_score > g_score: # best path for reaching the node `neighbour` 
-						open_set[neighbour].g_score = g_score
-						open_set[neighbour].prev_node_pose = current_node.pose
-
-		return [] # failure: open_set is empty but goal was never reached
 
 
 	# ------------------- CONTROLLERS
@@ -279,7 +76,9 @@ class ThymarController:
 		current_y = position.y
 		current_theta = orientation
 
-		obs_present, obs_dist, obs_odom = self.has_facing_obstacle(occupancy_grid, current_x, current_y, current_theta)
+		obs_present, obs_dist, obs_odom = grid_utils.has_facing_obstacle(occupancy_grid, self.grid_resolution, 
+																		current_x, current_y, current_theta,
+																		robot_visibility=self.robot_visibility, robot_width=self.robot_width)
 
 		if(not obs_present): # movement ahead
 			self.stucked_count = 0
@@ -298,8 +97,12 @@ class ThymarController:
 			right_distances = []
 			for i in range(1, 45, 5):
 				# please note that here the robot has double the normal visibility range
-				_, dist_left, _ = self.has_facing_obstacle(occupancy_grid, current_x, current_y, current_theta + np.deg2rad(i), robot_visibility=2*self.robot_visibility)
-				_, dist_right, _ = self.has_facing_obstacle(occupancy_grid, current_x, current_y, current_theta - np.deg2rad(i), robot_visibility=2*self.robot_visibility)
+				_, dist_left, _ = grid_utils.has_facing_obstacle(occupancy_grid, self.grid_resolution, 
+									current_x, current_y, current_theta + np.deg2rad(i), 
+									robot_visibility=2*self.robot_visibility, robot_width=self.robot_width)
+				_, dist_right, _ = grid_utils.has_facing_obstacle(occupancy_grid, self.grid_resolution, 
+									current_x, current_y, current_theta - np.deg2rad(i), 
+									robot_visibility=2*self.robot_visibility, robot_width=self.robot_width)
 				left_distances.append(dist_left or 4)
 				right_distances.append(dist_right or 4)
 
@@ -315,7 +118,10 @@ class ThymarController:
 					deg_delta /= 2 # ... steering angle decays 
 				current_theta += np.deg2rad(deg_delta) # step-by-step research
 				# please note that here the robot has double the normal visibility range
-				obs_present, obs_dist, obs_odom = self.has_facing_obstacle(occupancy_grid, current_x, current_y, current_theta, robot_visibility=2*self.robot_visibility)
+				obs_present, obs_dist, obs_odom = grid_utils.has_facing_obstacle(occupancy_grid, self.grid_resolution, 
+																				current_x, current_y, current_theta, 
+																				robot_visibility=2*self.robot_visibility,
+																				robot_width=self.robot_width)
 
 			# stops the robot and set goal for reaching the computed theta
 			self.next_status = self.status
@@ -324,6 +130,7 @@ class ThymarController:
 			self.goal_distance_tollerance = None
 			self.velocity = Twist()
 			rospy.loginfo('Steering for reaching theta {:.2f}...'.format(current_theta))
+
 
 
 	def explore_covering(self, position, orientation, occupancy_grid, 
@@ -336,8 +143,13 @@ class ThymarController:
 			rospy.loginfo('Recomputing path for reaching unknown areas...')
 			sx = position.x	
 			sy = position.y
-			self.planning_path = self.path_planning(occupancy_grid, self.allow_unknown_traversing, (sx, sy), 
-													goal_odom = None, goal_identifier = -1)
+			self.planning_path = grid_utils.path_planning(occupancy_grid, self.grid_resolution,
+															self.allow_unknown_traversing,
+															start_odom = (sx, sy), 
+															goal_odom = None, goal_identifier = -1,
+															obstacle_identifier = self.obstacle_identifier, 
+															unknown_identifier = self.unknown_identifier,
+															collision_expansion = self.obstacle_safe_distance)
 			
 			if self.planning_path == None or len(self.planning_path) == 0:
 				self.velocity = Twist() # stops the robot
@@ -360,7 +172,7 @@ class ThymarController:
 				break
 
 		next_pose = self.planning_path.pop(0)
-		next_area = occupancy_grid[self.odom_to_grid(next_pose)[::-1]]
+		next_area = occupancy_grid[grid_utils.odom_to_grid(next_pose, self.grid_resolution)[::-1]]
 		self.velocity = Twist() # stops the robot
 
 		if next_area == -1 or next_area == 100:
@@ -379,8 +191,7 @@ class ThymarController:
 	
 	def chase_planning(self, position, orientation, occupancy_grid, 
 						goal, goal_orientation, status_after_finish, 
-						recomputation = 6, skip_poses = 3, 
-						obstacle_identifier = 100, unknown_identifier = -1):
+						recomputation = 6, skip_poses = 3):
 		""" 
 			Chase a goal pose by using path planning. 
 			Path is recomputed after a number `recomputation` of intermediate poses reached;
@@ -388,19 +199,25 @@ class ThymarController:
 		"""
 
 		grid_with_target = np.copy(occupancy_grid)
-		if self.target_found and self.target_chasing: # do not consider the target as an obstacle
-			tx, ty = self.odom_to_grid((self.target.pose.x, self.target.pose.y))
+		
+		# if chasing target, do not consider it as an obstacle
+		if self.target_found and self.target_chasing:
+			tx, ty = grid_utils.odom_to_grid((self.target.pose.x, self.target.pose.y), self.grid_resolution)
 			w = np.ceil(self.target_distance_tollerance/self.grid_resolution).astype(int) + 1
-			grid_with_target[ty-w:ty+w, tx-w:tx+w] = obstacle_identifier - 5 # different from `obstacle_identifier`
+			grid_with_target[ty-w:ty+w, tx-w:tx+w] = self.obstacle_identifier - 5 # different from `obstacle_identifier`
 
 
 		if len(self.planning_path) == 0 or self.planning_count % recomputation == 0: 
 			rospy.loginfo('Recomputing path for chasing ({:.2f}, {:.2f}) ...'.format(goal.x, goal.y))
 			sx = position.x	
 			sy = position.y
-			self.planning_path = self.path_planning(grid_with_target, self.allow_unknown_traversing, (sx, sy), 
-													(goal.x, goal.y), None,
-													obstacle_identifier, unknown_identifier)
+			self.planning_path = grid_utils.path_planning(grid_with_target, self.grid_resolution,
+															self.allow_unknown_traversing,
+															start_odom = (sx, sy),  
+															goal_odom = (goal.x, goal.y), goal_identifier = None,
+															obstacle_identifier = self.obstacle_identifier, 
+															unknown_identifier = self.unknown_identifier,
+															collision_expansion = self.obstacle_safe_distance)
 			
 			if len(self.planning_path) == 0:
 				self.velocity = Twist() # stops the robot
@@ -423,11 +240,11 @@ class ThymarController:
 				break
 
 		next_pose = self.planning_path.pop(0)
-		next_area = grid_with_target[self.odom_to_grid(next_pose)[::-1]]
+		next_area = grid_with_target[grid_utils.odom_to_grid(next_pose, self.grid_resolution)[::-1]]
 		finished = True if len(self.planning_path) == 0 else False
 		self.velocity = Twist() # stops the robot
 
-		if next_area == unknown_identifier or next_area == obstacle_identifier:			
+		if next_area == self.unknown_identifier or next_area == self.obstacle_identifier:			
 			# it is possible that new explored areas are unknown or obstacles, so better not to reach them
 			self.planning_count = 0
 			rospy.loginfo('Early path recomputation because unknown area or obstacle has been seen on the path')
@@ -475,9 +292,10 @@ class ThymarController:
 			self.next_status = None
 			rospy.loginfo('Status changed to ' + str(self.status))
 
-		elif self.target_found and self.target_chasing and mv.euclidean_distance(position, self.target.pose) < self.target_distance_tollerance:
+		elif self.target_found and self.target_chasing and move_utils.euclidean_distance(position, self.target.pose) < self.target_distance_tollerance:
 			rospy.loginfo('TARGET REACHED!')
 			self.velocity = Twist()
+			self.planning_count = 0
 			self.target_chasing = False
 			self.target_caught = True
 			self.status = self.status_after_reaching_target
