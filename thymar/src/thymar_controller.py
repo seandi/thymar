@@ -240,7 +240,7 @@ class ThymarController:
 
 			neighbourhood = self.get_neighbourhood(grid, current_node.pose) # list of neighbours poses (tuple)
 			
-			for i, neighbour in enumerate(neighbourhood):
+			for _, neighbour in enumerate(neighbourhood):
 			
 				if neighbour in closed_set:
 					continue # already explored
@@ -318,7 +318,7 @@ class ThymarController:
 
 
 	def explore_covering(self, position, orientation, occupancy_grid, 
-						recomputation = 3, skip_poses = 3, nopath_status = Status.END):
+						recomputation = 4, skip_poses = 3, nopath_status = Status.END):
 		""" Explores the environment while always managing to reach the nearest undiscovered position in the map. """
 
 		# path planning is only recomputed every `recomputation` timesteps
@@ -362,7 +362,7 @@ class ThymarController:
 	
 	def chase_planning(self, position, orientation, grid, goal, goal_orientation, 
 						status_after_finish, goal_distance_tollerance = None, 
-						recomputation = 6, skip_poses = 4):
+						recomputation = 10, skip_poses = 4):
 		# path planning is only recomputed every `recomputation` timesteps
 		if len(self.planning_path) == 0 or (recomputation > 0 and self.planning_count % recomputation == 0): 
 			rospy.loginfo('Recomputing path for chasing ({:.2f}, {:.2f}) ...'.format(goal.x, goal.y))
@@ -406,16 +406,6 @@ class ThymarController:
 
 
 	def chase_straight(self, position, orientation, goal, goal_orientation):
-		if self.target_found and self.target_chasing and not self.target_caught:
-			if np.sqrt((self.target.pose.x - position.x)**2 + (self.target.pose.y - position.y)**2) < self.target.radius * 3 + self.robot_width:
-				rospy.loginfo('TARGET REACHED!')
-				self.target_chasing = False
-				self.target_caught = True
-				self.velocity = Twist()
-				self.status = self.status_after_reaching_target
-
-				return
-
 
 		done, vel = self.motion_controller.move(position, orientation,
 												goal, target_orientation=goal_orientation,
@@ -461,13 +451,13 @@ class ThymarController:
 
 		elif self.status == Status.EXPLORING_COVERAGE:
 			self.explore_covering(position, orientation, occupancy_grid, 
+								recomputation = 10, skip_poses = 3,
 								nopath_status = self.status_after_mapcoverage)
 
 		elif self.status == Status.CHASING_GOAL:
 			self.chase_straight(position, orientation, self.goal, self.goal.theta)
 
 		elif self.status == Status.CHASING_TARGET:
-			# self.goal_distance_tollerance = self.target.radius * 6 + self.robot_width
 			self.chase_planning(position, orientation, occupancy_grid, 
 								self.target.pose, goal_orientation = None, 
 								status_after_finish = self.status_after_reaching_target, 
