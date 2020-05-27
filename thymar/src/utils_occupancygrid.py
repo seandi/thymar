@@ -99,7 +99,7 @@ class GraphNode:
 
 
 
-def is_valid_neighbour(grid, gpose, obstacle_identifier = 100, collision_expansion = 3):
+def is_valid_neighbour(grid, gpose, obstacle_identifier, collision_expansion):
     # When reading this code, please remember that while pose is expressed as (X,Y),
     # the matrix indexing for `grid` is instead to be done as (Y,X).
     # Moreover, the Y is flipped in the map (see maps images), then for moving the

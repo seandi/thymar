@@ -42,7 +42,7 @@ class Thymar:
         self.position = Point()
         self.orientation = 0
         self.target_found = False
-        self.target = Target()
+        self.target = None
         self.grid_width = None
         self.grid_height = None
         self.grid_resolution = None
@@ -127,11 +127,7 @@ class Thymar:
         print('Controller is running! \n')
 
         while not rospy.is_shutdown() and not controller.status == Status.END:
-            if self.target_found:
-                controller.target_found = True
-                controller.target = self.target
-
-            vel = controller.run(self.position, self.orientation, self.occupancy_grid)
+            vel = controller.run(self.position, self.orientation, self.occupancy_grid, self.target)
             self.velocity_publisher.publish(vel)
             self.rate.sleep()
 
