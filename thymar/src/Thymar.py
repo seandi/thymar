@@ -122,7 +122,7 @@ class Thymar:
                         status_after_founding_target = Status.CHASING_TARGET,
                         status_after_reaching_target = Status.EXPLORING_COVERAGE,
                         status_after_mapcoverage = Status.RETURNING,
-                        allow_unknown_traversing = False)
+                        allow_unknown_traversing = True)
 
         print('Controller is running! \n')
 

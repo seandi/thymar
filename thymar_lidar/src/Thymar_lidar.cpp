@@ -121,6 +121,11 @@ void ThymarLidar::parseOdometry(const nav_msgs::Odometry::ConstPtr& msg){
 void ThymarLidar::run(){
 
 	visualization_msgs::Marker target_marker;
+	// this->target_found=true;
+	// this->target_model.x = -2.85;
+	// this->target_model.y = 1.86;
+	// this->target_model.radius = 0.15;
+	// target_marker = this->getTargetMarker();
 	
 	while(ros::ok()){
 
@@ -154,10 +159,11 @@ void ThymarLidar::run(){
 				target_marker = this->getTargetMarker();
         	}
 
-			if(this->target_found)
-				this->target_marker_publisher.publish(target_marker);
-
 		}
+
+		if(this->target_found)
+			this->target_marker_publisher.publish(target_marker);
+
 
 		ros::spinOnce();
 		this->rate.sleep();

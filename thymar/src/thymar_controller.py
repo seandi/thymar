@@ -137,6 +137,9 @@ class ThymarController:
 						recomputation = 5, skip_poses = 3, nopath_status = Status.END):
 		""" Explores the environment while always managing to reach the nearest unknown position in the map. """
 
+		if len(self.planning_path) > 100:
+			recomputation = len(self.planning_path) // 2
+
 		# path planning is only recomputed every `recomputation` timesteps or the path is too short
 		min_path_length = np.ceil(self.robot_width / self.grid_resolution/2).astype(int)
 		if len(self.planning_path) < min_path_length or self.planning_count % recomputation == 0: 
@@ -205,6 +208,9 @@ class ThymarController:
 			tx, ty = grid_utils.odom_to_grid((self.target.pose.x, self.target.pose.y), self.grid_resolution)
 			w = np.ceil(self.target_distance_tollerance/self.grid_resolution).astype(int) + 1
 			grid_with_target[ty-w:ty+w, tx-w:tx+w] = self.obstacle_identifier - 5 # different from `obstacle_identifier`
+		
+		if len(self.planning_path) > 100:
+			recomputation = len(self.planning_path) // 2
 
 
 		if len(self.planning_path) == 0 or self.planning_count % recomputation == 0: 
