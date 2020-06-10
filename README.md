@@ -1,5 +1,13 @@
 # Thymar project
 
+Università della Svizzera Italiana (Lugano)  
+Robotics 2020 - Simone Eandi, Marco Ferri, Nadia Younis
+
+- [Project Write-up](https://github.com/seandi/thymar/blob/master/Final%20Report.pdf)
+- [Presentation](https://github.com/seandi/thymar/blob/master/Final%20Presentation.pdf)
+- [Video](https://drive.google.com/file/d/1r2YChtbzDf7fFCkZUTkUM8uDU0vg8qnO/view?usp=sharing)
+
+
 ## Requirements
 
 - `thymio_description` package (already intalled on the VM):
