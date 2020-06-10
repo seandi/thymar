@@ -1,7 +1,10 @@
-# Thymar project
+# Thymar Project | LIDAR Mapping + Path Planning
 
 Università della Svizzera Italiana (Lugano)  
 Robotics 2020 - Simone Eandi, Marco Ferri, Nadia Younis
+
+Exploration of an unknown environment to search for a target object.
+Simulation of a robot that senses the surroundings using a LIDAR for creating the 3D map of obstacles later converted into the 2D map of traversable terrain. The map is finally used for doing path planning in order to explore unknown areas until the target object is found and reached.
 
 - [Project Write-up](https://github.com/seandi/thymar/blob/master/Final%20Report.pdf)
 - [Presentation](https://github.com/seandi/thymar/blob/master/Final%20Presentation.pdf)
