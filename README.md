@@ -16,7 +16,7 @@ Simulation of a robot that senses the surroundings using a LIDAR for creating th
 - `thymio_description` package (already intalled on the VM):
   1. `cd catkin_ws/src/`
   2. `git clone https://github.com/jeguzzi/ros-aseba.git`
-  3. **Important: in `base.urdf.xarco` inside the Thymar package replace the line `<odometrySource>encoder</odometrySource>` with `<odometrySource>world</odometrySource>`**
+  3. **Important: in `base.urdf.xarco` inside the Thymio package replace the line `<odometrySource>encoder</odometrySource>` with `<odometrySource>world</odometrySource>`**
   
 - `velodyne` plugin (to be installed):
   1. `cd catkin_ws/src/`
