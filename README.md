@@ -8,7 +8,7 @@ Simulation of a robot that senses the surroundings using a LIDAR for creating th
 
 - [Project Write-up](https://github.com/seandi/thymar/blob/master/Final%20Report.pdf)
 - [Presentation](https://github.com/seandi/thymar/blob/master/Final%20Presentation.pdf)
-- [Video](https://drive.google.com/file/d/1r2YChtbzDf7fFCkZUTkUM8uDU0vg8qnO/view?usp=sharing)
+- [Video](https://drive.google.com/file/d/1RUhRVhZBvooa0taXG4jGTvvAPc8hiaTt/view?usp=sharing)
 
 
 ## Requirements
